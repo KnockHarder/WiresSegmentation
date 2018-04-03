@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 01-Apr-2018 16:56:13
+% Last Modified by GUIDE v2.5 03-Apr-2018 18:27:56
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -112,7 +112,36 @@ function doFunc_Callback(hObject, eventdata, handles)
 % hObject    handle to doFunc (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.rstImg = WD.wiresEnhance( handles.inImg );
+
+minValue = str2double( get( handles.valueA, 'String' ) );
+maxValue = str2double(get( handles.valueB, 'String' ) );
+phases = str2double(get( handles.valueN, 'String' ) );
+
+if( isnan(minValue) || isnan(maxValue) || isnan(phases) )
+    set( handles.currentState, 'String',...
+        'Values (min,max,phase) are not numbers.' );
+    return;
+end
+
+minValue = round( minValue );
+maxValue = round( maxValue );
+phases = round( phases );
+if( minValue < 0 || maxValue < 0 || minValue == maxValue ...
+        || phases < 0 ||  phases > 100 )
+    set( handles.currentState, 'String', ...
+        'Values (min,max,phase) are out of place.' );
+    return;
+end
+
+if( minValue > maxValue )
+    x = minValue; minValue = maxValue; maxValue =x;
+end
+
+set( handles.valueA, 'String', minValue );
+set( handles.valueB, 'String', maxValue );
+set( handles.valueN, 'String', phases );
+
+handles.rstImg = WD.areaCut( handles.inImg, minValue, maxValue, phases );
 
 set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
@@ -130,14 +159,14 @@ function disOption_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from disOption
 v = get(handles.disOption,'Value');
 resize = get( handles.resizeSlider, 'value' );
-inImg = handles.inImg;
+colImg = handles.colImg;
 rstImg = handles.rstImg;
 
 switch  v
     case    1   % show original image
-        if ~isempty(inImg)
-            inImg = imresize( inImg , resize );
-            imshow(inImg,'parent',handles.figAxis);
+        if ~isempty(colImg)
+            colImg = imresize( colImg , resize );
+            imshow(colImg,'parent',handles.figAxis);
         else
             set(handles.currentStatus,'String','No image selected!');
         end
@@ -190,4 +219,74 @@ function resizeSlider_CreateFcn(hObject, eventdata, handles)
 % Hint: slider controls usually have a light gray background.
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+function valueA_Callback(hObject, eventdata, handles)
+% hObject    handle to valueA (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of valueA as text
+%        str2double(get(hObject,'String')) returns contents of valueA as a double
+
+
+
+% --- Executes during object creation, after setting all properties.
+function valueA_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueA (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function valueB_Callback(hObject, eventdata, handles)
+% hObject    handle to valueB (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of valueB as text
+%        str2double(get(hObject,'String')) returns contents of valueB as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function valueB_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueB (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function valueN_Callback(hObject, eventdata, handles)
+% hObject    handle to valueN (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of valueN as text
+%        str2double(get(hObject,'String')) returns contents of valueN as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function valueN_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueN (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
 end

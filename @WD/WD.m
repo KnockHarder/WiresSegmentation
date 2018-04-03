@@ -9,7 +9,7 @@ classdef WD
     end
     
     methods( Static )
-        enImg = wiresEnhance( inImg );
+        enImg = areaCut( inImg, min, max, phases );
     end
     
 end
