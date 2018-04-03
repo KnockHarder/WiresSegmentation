@@ -86,8 +86,14 @@ function loadImg_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-[colImg,inImg,~, ~] = StdIP.readImg2D(-1);
-inImg = inImg/max(inImg(:));
+try
+    [colImg,inImg,~, ~] = StdIP.readImg2D(-1);
+    inImg = inImg/max(inImg(:));
+catch ME
+    set( handles.currentState, 'String', ...
+        strcat('Failed to load,erro code: ',ME.identifier ) );
+    return;
+end
 
 % inImg = imadjust(inImg);
 handles.colImg = colImg;
@@ -106,7 +112,7 @@ function doFunc_Callback(hObject, eventdata, handles)
 % hObject    handle to doFunc (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.rstImg = WD.areaEnhance( handles.inImg );
+handles.rstImg = WD.wiresEnhance( handles.inImg );
 
 set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);

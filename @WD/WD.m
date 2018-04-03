@@ -9,7 +9,7 @@ classdef WD
     end
     
     methods( Static )
-        enImg = areaEnhance( inImg );
+        enImg = wiresEnhance( inImg );
     end
     
 end
