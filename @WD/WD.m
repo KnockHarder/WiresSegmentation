@@ -9,8 +9,9 @@ classdef WD
     end
     
     methods( Static )
-        enImg = areaCut( inImg, min, max, phases );
+        enImg = areaCut( inImg, minValue, maxValue, phases );
+        enImg = contrastEnhance( inImg, P, alpha );
     end
-    
+        
 end
 

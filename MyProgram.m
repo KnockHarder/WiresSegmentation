@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 03-Apr-2018 18:27:56
+% Last Modified by GUIDE v2.5 05-Apr-2018 20:05:23
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -58,9 +58,12 @@ handles.output = hObject;
 % All the user data goes here
 handles.colImg = [];
 handles.inImg = [];
+handles.CEImg = [];
+handles.BEImg = [];
 handles.rstImg = [];
 
-set(handles.doFunc,'enable','off');
+set(handles.contrastEnhance,'enable','off');
+set(handles.binaryEnhance,'enable','off');
 
 % Update handles structure
 guidata(hObject, handles);
@@ -98,24 +101,27 @@ end
 % inImg = imadjust(inImg);
 handles.colImg = colImg;
 handles.inImg = inImg;
+handles.CEImg = inImg;
+handles.BEImg = [];
 handles.rstImg = [];
 
 set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
-set(handles.doFunc,'enable','on');
-set(handles.currentState,'String','Ready for processing');
+set( handles.contrastEnhance, 'enable', 'on' );
+set( handles.binaryEnhance, 'enable', 'on' );
+set( handles.currentState, 'String','Ready for processing' );
 guidata(hObject, handles);
 
 
-% --- Executes on button press in doFunc.
-function doFunc_Callback(hObject, eventdata, handles)
-% hObject    handle to doFunc (see GCBO)
+% --- Executes on button press in binaryEnhance.
+function binaryEnhance_Callback(hObject, eventdata, handles)
+% hObject    handle to binaryEnhance (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-minValue = str2double( get( handles.valueA, 'String' ) );
-maxValue = str2double(get( handles.valueB, 'String' ) );
-phases = str2double(get( handles.valueN, 'String' ) );
+minValue = str2double( get( handles.valueMin, 'String' ) );
+maxValue = str2double(get( handles.valueMax, 'String' ) );
+phases = str2double(get( handles.valueP, 'String' ) );
 
 if( isnan(minValue) || isnan(maxValue) || isnan(phases) )
     set( handles.currentState, 'String',...
@@ -137,15 +143,15 @@ if( minValue > maxValue )
     x = minValue; minValue = maxValue; maxValue =x;
 end
 
-set( handles.valueA, 'String', minValue );
-set( handles.valueB, 'String', maxValue );
-set( handles.valueN, 'String', phases );
+set( handles.valueMin, 'String', minValue );
+set( handles.valueMax, 'String', maxValue );
+set( handles.valueP, 'String', phases );
 
-handles.rstImg = WD.areaCut( handles.inImg, minValue, maxValue, phases );
+handles.BEImg = WD.areaCut( handles.CEImg, minValue, maxValue, phases );
 
-set(handles.disOption,'Value',2);
+set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
-set(handles.currentState,'String','Enhancement is done');
+set(handles.currentState,'String','Binary Enhancement is done');
 guidata(hObject, handles);
 
 
@@ -160,22 +166,40 @@ function disOption_Callback(hObject, eventdata, handles)
 v = get(handles.disOption,'Value');
 resize = get( handles.resizeSlider, 'value' );
 colImg = handles.colImg;
+CEImg = handles.CEImg;
+BEImg = handles.BEImg;
 rstImg = handles.rstImg;
 
 switch  v
-    case    1   % show original image
-        if ~isempty(colImg)
+    case    1    % show original image
+        if ~isempty( colImg )
             colImg = imresize( colImg , resize );
-            imshow(colImg,'parent',handles.figAxis);
+            imshow( colImg, 'parent', handles.figAxis );
         else
-            set(handles.currentStatus,'String','No image selected!');
+            set( handles.currentState, 'String', 'No image selected');
         end
-    case    2   % show result image
-        if ~isempty(rstImg)
-            rstImg = imresize( rstImg , resize );
-            imshow(rstImg,'parent',handles.figAxis);
+    case    2    % show contrast enhancement image
+        if ~isempty( CEImg )
+            CEImg = imresize( CEImg, resize );
+            imshow( CEImg, 'parent', handles.figAxis );
         else
-            set(handles.currentState,'String','No result image found!');
+            set( handles.currentState, 'String', ...
+                'Not contrast-enhanced yet' );
+        end
+    case    3    % show binary enhancement image
+        if ~isempty( BEImg )
+            BEImg = imresize( BEImg, resize );
+            imshow( BEImg, 'parent', handles.figAxis );
+        else
+            set( handles.currentState, 'String', ...
+                'Not binary-enhanced yet' );
+        end
+    case    4    % show result image
+        if ~isempty( rstImg )
+            rstImg = imresize( rstImg , resize );
+            imshow( rstImg, 'parent', handles.figAxis );
+        else
+            set( handles.currentState, 'String', 'No result image found');
         end
     otherwise
         set(handles.currentState,'String','Not yet implemented!');
@@ -204,8 +228,8 @@ function resizeSlider_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 value = get( handles.resizeSlider,'value' );
-value = round( value * 10) / 10;
-set( handles.resizeSlider, 'value',  value );
+value = round( value * 10 ) / 10;
+set( handles.resizeSlider, 'value', value );
 set( handles.resizeValue, 'String',  value );
 disOption_Callback(hObject, eventdata, handles);
 
@@ -223,19 +247,19 @@ end
 
 
 
-function valueA_Callback(hObject, eventdata, handles)
-% hObject    handle to valueA (see GCBO)
+function valueMin_Callback(hObject, eventdata, handles)
+% hObject    handle to valueMin (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of valueA as text
-%        str2double(get(hObject,'String')) returns contents of valueA as a double
+% Hints: get(hObject,'String') returns contents of valueMin as text
+%        str2double(get(hObject,'String')) returns contents of valueMin as a double
 
 
 
 % --- Executes during object creation, after setting all properties.
-function valueA_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to valueA (see GCBO)
+function valueMin_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueMin (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -247,18 +271,18 @@ end
 
 
 
-function valueB_Callback(hObject, eventdata, handles)
-% hObject    handle to valueB (see GCBO)
+function valueMax_Callback(hObject, eventdata, handles)
+% hObject    handle to valueMax (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of valueB as text
-%        str2double(get(hObject,'String')) returns contents of valueB as a double
+% Hints: get(hObject,'String') returns contents of valueMax as text
+%        str2double(get(hObject,'String')) returns contents of valueMax as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function valueB_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to valueB (see GCBO)
+function valueMax_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueMax (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -270,18 +294,18 @@ end
 
 
 
-function valueN_Callback(hObject, eventdata, handles)
-% hObject    handle to valueN (see GCBO)
+function valueP_Callback(hObject, eventdata, handles)
+% hObject    handle to valueP (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of valueN as text
-%        str2double(get(hObject,'String')) returns contents of valueN as a double
+% Hints: get(hObject,'String') returns contents of valueP as text
+%        str2double(get(hObject,'String')) returns contents of valueP as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function valueN_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to valueN (see GCBO)
+function valueP_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueP (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -290,3 +314,90 @@ function valueN_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on slider movement.
+function alphaSlider_Callback(hObject, eventdata, handles)
+% hObject    handle to alphaSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+value = get( handles.alphaSlider,'value' );
+value = round( value );
+set( handles.alphaSlider, 'value', value );
+set( handles.alphaValue, 'String',  value );
+disOption_Callback(hObject, eventdata, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function alphaSlider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to alphaSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+function valueAlpha_Callback(hObject, eventdata, handles)
+% hObject    handle to valueAlpha (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of valueAlpha as text
+%        str2double(get(hObject,'String')) returns contents of valueAlpha as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function valueAlpha_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to valueAlpha (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in contrastEnhance.
+function contrastEnhance_Callback(hObject, eventdata, handles)
+% hObject    handle to contrastEnhance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+maxValue = str2double(get( handles.valueMax, 'String' ) );
+alpha = str2double( get( handles.valueAlpha, 'String' ) );
+
+if( isnan(maxValue) || isnan(alpha) )
+    set( handles.currentState, 'String',...
+        'Values (alpha,max) are not numbers.' );
+    return;
+end
+
+maxValue = round( maxValue );
+if( alpha < 1 || maxValue < 0 )
+    set( handles.currentState, 'String', ...
+        'Values (alpha,max) are inappropriate.' );
+    return;
+end
+
+set( handles.valueAlpha, 'String', alpha );
+set( handles.valueMax, 'String', maxValue );
+
+if alpha > 1
+    handles.CEImg = WD.contrastEnhance( handles.inImg, maxValue, alpha );
+else
+    handles.CEImg = handles.inImg;
+end
+
+set(handles.disOption,'Value',2);
+disOption_Callback(hObject, eventdata, handles);
+set(handles.currentState,'String','Contrast Enhancement is done');
+set(handles.binaryEnhance, 'enable', 'on' );
+guidata(hObject, handles);
