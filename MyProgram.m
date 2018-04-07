@@ -371,30 +371,10 @@ function contrastEnhance_Callback(hObject, eventdata, handles)
 % hObject    handle to contrastEnhance (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-alpha = str2double( get( handles.valueAlpha, 'String' ) );
-
-if( isnan(alpha) )
-    set( handles.currentState, 'String',...
-        'Values (alpha,max) are not numbers.' );
-    return;
-end
-
-if( alpha < 0 )
-    set( handles.currentState, 'String', ...
-        'The value (alpha) is inappropriate.' );
-    return;
-end
-
-set( handles.valueAlpha, 'String', alpha );
-
-if alpha > 0
-    if( get( handles.vesselBright, 'value' ) )
-        handles.CEImg = WD.contrastEnhance( handles.inImg, alpha );
-    else
-        handles.CEImg = WD.contrastEnhance( 1 - handles.inImg, alpha );
-    end
+if( get( handles.vesselBright, 'value' ) )
+    handles.CEImg = WD.contrastEnhance( handles.inImg );
 else
-    handles.CEImg = handles.inImg;
+    handles.CEImg = WD.contrastEnhance( 1 - handles.inImg );
 end
 
 set(handles.disOption,'Value',2);

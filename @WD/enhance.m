@@ -1,8 +1,7 @@
-function enImg = enhance( inImg, P, alpha )
+function enImg = enhance( inImg, P)
 %ENHANCE 此处显示有关此函数的摘要
 %   此处显示详细说明
 assert( ndims( inImg ) == 2 );
-assert( alpha > 0 );
 
 [x, y] = size( inImg );
 enImg = zeros( x, y );
@@ -10,10 +9,11 @@ interested = zeros( 1, x * y );
 len = uint64(1);
 
 bw = edge( inImg, 'sobel' );
-se = strel( 'disk', 10 );
+se = strel( 'disk', 20 );
 bw = imclose( bw, se );
 % figure, imshow( bw );
 mask = bwareaopen( bw, P );
+bw = mask;
 for i = 1 : x
     for j = 1 : y
         if mask(i,j) > 0
@@ -23,8 +23,8 @@ for i = 1 : x
     end
 end
 interested = interested( 1:len );
-
 interested = sort( interested );
+maxValue = interested( len );
 nValues = length( unique( interested ) );
 frequence = zeros( 1, nValues );
 index = zeros( 1, nValues );
@@ -75,13 +75,11 @@ for i = 1 : x
     for j = 1 : y
         pixel = inImg(i,j) * bw(i,j);
         if abs( pixel - lambda ) > eps
-            if pixel < lambda
-                enImg(i,j) = lambda * pixel / ( ( alpha + 1 ) * lambda - ...
-                    alpha * pixel );
+            if pixel < lambda 
+                enImg(i,j) = 0;
             else
-                enImg(i,j) = 1 - ( 1 - pixel ) / ( ...
-                    alpha * ( pixel - lambda ) / ( 1 - lambda )...
-                    + 1 );
+                enImg(i,j) = power( ( pixel - lambda ) / ...
+                    ( maxValue - lambda ), 2 );
             end
         end
     end
