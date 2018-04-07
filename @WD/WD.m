@@ -10,8 +10,14 @@ classdef WD
     
     methods( Static )
         enImg = areaCut( inImg, minValue, maxValue, phases );
-        enImg = contrastEnhance( inImg, P, alpha );
-    end
         
+        function enImg = contrastEnhance( inImg, alpha )
+            enImg = WD.enhance( inImg, 5000, alpha );
+        end
+    end
+    
+    methods( Static, Access = private )
+        enImg = enhance( inImg, P, alpha );
+    end
 end
 

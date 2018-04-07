@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 05-Apr-2018 20:05:23
+% Last Modified by GUIDE v2.5 07-Apr-2018 12:56:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -147,7 +147,7 @@ set( handles.valueMin, 'String', minValue );
 set( handles.valueMax, 'String', maxValue );
 set( handles.valueP, 'String', phases );
 
-handles.BEImg = WD.areaCut( handles.CEImg, minValue, maxValue, phases );
+handles.BEImg = WD.areaCut( handles.inImg, minValue, maxValue, phases );
 
 set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
@@ -371,27 +371,28 @@ function contrastEnhance_Callback(hObject, eventdata, handles)
 % hObject    handle to contrastEnhance (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-maxValue = str2double(get( handles.valueMax, 'String' ) );
 alpha = str2double( get( handles.valueAlpha, 'String' ) );
 
-if( isnan(maxValue) || isnan(alpha) )
+if( isnan(alpha) )
     set( handles.currentState, 'String',...
         'Values (alpha,max) are not numbers.' );
     return;
 end
 
-maxValue = round( maxValue );
-if( alpha < 1 || maxValue < 0 )
+if( alpha < 0 )
     set( handles.currentState, 'String', ...
-        'Values (alpha,max) are inappropriate.' );
+        'The value (alpha) is inappropriate.' );
     return;
 end
 
 set( handles.valueAlpha, 'String', alpha );
-set( handles.valueMax, 'String', maxValue );
 
-if alpha > 1
-    handles.CEImg = WD.contrastEnhance( handles.inImg, maxValue, alpha );
+if alpha > 0
+    if( get( handles.vesselBright, 'value' ) )
+        handles.CEImg = WD.contrastEnhance( handles.inImg, alpha );
+    else
+        handles.CEImg = WD.contrastEnhance( 1 - handles.inImg, alpha );
+    end
 else
     handles.CEImg = handles.inImg;
 end
@@ -401,3 +402,21 @@ disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
 set(handles.binaryEnhance, 'enable', 'on' );
 guidata(hObject, handles);
+
+
+% --- Executes on button press in vesselBright.
+function vesselBright_Callback(hObject, eventdata, handles)
+% hObject    handle to vesselBright (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of vesselBright
+
+
+% --- Executes on button press in vesselDark.
+function vesselDark_Callback(hObject, eventdata, handles)
+% hObject    handle to vesselDark (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of vesselDark
