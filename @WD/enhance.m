@@ -79,7 +79,7 @@ for i = 1 : x
                 enImg(i,j) = 0;
             else
                 enImg(i,j) = power( ( pixel - lambda ) / ...
-                    ( maxValue - lambda ), 2 );
+                    ( maxValue - lambda ), 3 );
             end
         end
     end
