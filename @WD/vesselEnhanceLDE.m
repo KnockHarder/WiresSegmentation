@@ -32,21 +32,21 @@ function [resp] = LDE(I,all_theta,psi,d,sigma,sgn)
 %   all_theta -- orientation for detection filter
 %   psi       -- orientations of evidence filter, for each value of theta
 %   d         -- d = k*sigma
-drawtemplate        = 0;
+drawtemplate        = 1;
 l_theta             = length(all_theta);
 l_psi               = length(psi);
 ind                 = 0;
 siz     = round(6*sigma);
+[mI,nI] = size( I );
 [X,Y]   = meshgrid(-siz:siz);
-G       = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
+G       = exp( -(X.^2+Y.^2) / (2*sigma^2) ) / ( sqrt(2*pi) * sigma );
 Gxx     = (X.^2-sigma^2).*G/(sigma^4);
 Gyy     = (Y.^2-sigma^2).*G/(sigma^4);
 Gxy     = (X.*Y).*G/(sigma^4);
-substack= [];
 
 for ii = 1 : l_theta
     rot = all_theta(ii);
-    substack = [];
+    substack = zeros( mI, nI, l_psi );
     for jj = 1:l_psi
         ind = ind+1;
         orientation = psi(jj)+rot;
@@ -63,14 +63,14 @@ for ii = 1 : l_theta
         else
             X_d_f = X - d*sind(orientation);
             Y_d_f = Y + d*cosd(orientation);
-            G_d_f = exp(-(X_d_f.^2+Y_d_f.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
+            G_d_f = exp(-(X_d_f.^2+Y_d_f.^2)/(2*sigma^2))/( sqrt(2*pi) * sigma );
             Gxx_d_f = (X_d_f.^2-sigma^2).*G_d_f/(sigma^4);
             Gyy_d_f = (Y_d_f.^2-sigma^2).*G_d_f/(sigma^4);
             Gxy_d_f = (X_d_f.*Y_d_f).*G_d_f/(sigma^4);
             
             X_d_b = X - d*sind(orientation);
             Y_d_b = Y - d*cosd(orientation);
-            G_d_b = exp(-(X_d_b.^2+Y_d_b.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
+            G_d_b = exp(-(X_d_b.^2+Y_d_b.^2)/(2*sigma^2))/( sqrt(2*pi) * sigma );
             Gxx_d_b = (X_d_b.^2-sigma^2).*G_d_b/(sigma^4);
             Gyy_d_b = (Y_d_b.^2-sigma^2).*G_d_b/(sigma^4);
             Gxy_d_b = (X_d_b.*Y_d_b).*G_d_b/(sigma^4);
@@ -90,11 +90,11 @@ for ii = 1 : l_theta
         t = find(I_theta<0);
         I_theta(t) = 0;
         substack(:,:,jj) = I_theta;
-        if drawtemplate
-            figure(2);
-            subtightplot(l_theta,l_psi,ind,0.01,0.01,0.01);imagesc(R_d+R_b+R_f);
-            drawnow; colormap('hot'); axis off;
-        end
+%         if drawtemplate
+%             figure(2);
+%             plot(l_theta,l_psi,ind,0.01,0.01,0.01);imagesc(R_d+R_b+R_f);
+%             drawnow; colormap('hot'); axis off;
+%         end
     end
     stack(:,:,ii) = max(substack,[],3);
 end
