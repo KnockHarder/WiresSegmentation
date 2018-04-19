@@ -9,7 +9,7 @@ interested = zeros( 1, x * y );
 len = uint64(1);
 
 bw = edge( inImg, 'sobel' );
-se = strel( 'disk', 20 );
+se = strel( 'disk', 2 );
 bw = imclose( bw, se );
 % figure, imshow( bw );
 mask = bwareaopen( bw, P );
@@ -73,7 +73,8 @@ lambda = modeV;
 
 for i = 1 : x
     for j = 1 : y
-        pixel = inImg(i,j) * bw(i,j);
+%         pixel = inImg(i,j) * bw(i,j);
+        pixel = inImg(i,j);
         if abs( pixel - lambda ) > eps
             if pixel < lambda 
                 enImg(i,j) = 0;
