@@ -235,7 +235,8 @@ function vesselCluster_Callback(hObject, eventdata, handles)
 % hObject    handle to vesselCluster (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.rstImg = label2rgb( WD.vesselCluster( handles.enImg ) );
+handles.rstImg = label2rgb( WD.vesselCluster( handles.enImg ), ...
+    @jet, [.5, .5, .5] );
 set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Vessel Cluster is done');

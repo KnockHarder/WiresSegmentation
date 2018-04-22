@@ -6,7 +6,7 @@ assert( ndims(inImg) == 2 );
 I = inImg;
 [m, n] = size( I );
 
-thresh = 0.3;
+thresh = 0.2;
 sz = 6;
 assert( m > sz * 3  &&  n > sz * 3 );
 I( 1:sz, : ) = 0;
