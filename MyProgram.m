@@ -62,6 +62,7 @@ handles.enImg = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
+set( handles.vesselCluster, 'enable', 'off' );
 
 % Update handles structure
 guidata(hObject, handles);
@@ -105,6 +106,7 @@ handles.rstImg = [];
 set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
 set( handles.contrastEnhance, 'enable', 'on' );
+set( handles.vesselCluster, 'enable', 'off' );
 set( handles.currentState, 'String','Ready for processing' );
 guidata(hObject, handles);
 
@@ -206,6 +208,7 @@ end
 set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
+set( handles.vesselCluster, 'enable', 'on' );
 guidata(hObject, handles);
 
 
