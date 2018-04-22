@@ -10,6 +10,7 @@ classdef WD
     
     methods( Static )
         enhI = vesselEnhanceLDE(param);
+        labels = vesselCluster( inImg )
         
         function enImg = contrastEnhance( inImg )
             param_LDE.origin = inImg;

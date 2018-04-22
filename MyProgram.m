@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 07-Apr-2018 12:56:09
+% Last Modified by GUIDE v2.5 22-Apr-2018 20:54:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -225,3 +225,15 @@ function vesselDark_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of vesselDark
+
+
+% --- Executes on button press in vesselCluster.
+function vesselCluster_Callback(hObject, eventdata, handles)
+% hObject    handle to vesselCluster (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles.rstImg = label2rgb( WD.vesselCluster( handles.enImg ) );
+set(handles.disOption,'Value',3);
+disOption_Callback(hObject, eventdata, handles);
+set(handles.currentState,'String','Vessel Cluster is done');
+guidata(hObject, handles);
