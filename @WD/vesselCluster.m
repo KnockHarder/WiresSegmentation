@@ -1,4 +1,4 @@
-function labels = vesselCluster( inImg )
+function [labelImg, labels] = vesselCluster( inImg )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
 assert( ndims(inImg) == 2 );
@@ -6,53 +6,106 @@ assert( ndims(inImg) == 2 );
 I = inImg;
 [m, n] = size( I );
 
-thresh = 0.2;
-sz = 6;
-assert( m > sz * 3  &&  n > sz * 3 );
-I( 1:sz, : ) = 0;
-I( m-sz+1:m, :) = 0;
-I( :, 1:sz ) = 0;
-I( :, n-sz+1:n) = 0;
-
-labels = ones( m, n );
-labels = labels * -1;
-labels(  I == 0  ) = 0;
-nextLabel = 1;
-
 all_theta = -90:15:90;
 l_theta = length( all_theta );
+sz = 6; assert( m > sz * 3  &&  n > sz * 3 );
 filters = getLDE( sz, 0.6, all_theta );
+evidences = zeros( m, n, l_theta ); 
+varTresh = 0.2;
+for i = 1 : l_theta
+    evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
+end
 
-evidences = zeros( l_theta, 1 );
-for i = sz +1 : m - sz
-    for j = sz +1 : n - sz
-        if labels(i,j) == -1
-            sam = I( i-sz:i+sz, j-sz:j+sz );
-            samLables = labels( i-sz:i+sz, j-sz:j+sz );
-            for ii = 1 : l_theta
-                evidences(ii) = sum( sum( sam .* filters(:,:,ii) ) );    
-            end
-            [maxEvi, max_idx] = max( evidences );
+variances = var(evidences, 1, 3);
+variances = variances * l_theta;
+[maxEvi, directMax] = max(evidences, [], 3);
 
-            if maxEvi - I(i,j) < thresh
-                labels(i,j) = 0;
+labelImg = zeros(m,n);
+labelImg( variances > varTresh ) = -1;
+labelImg( variances <= varTresh & maxEvi > 0.1 ) = -2;
+
+maxLabel = 0;
+labelHits = zeros(m*n, 1);
+hitsThresh = 20;
+bendError = 25;
+
+labelImg( 1:sz, : ) = 0;
+labelImg( :, 1:sz ) = 0;
+labelImg( m-sz+1:m, : ) = 0;
+labelImg( :, n-sz+1:n ) = 0;
+
+sigma = 1;
+X = 1 : (2 * sz + 1) ^ 2;
+GX = exp( -(X.^2) / (2*sigma^2) ) / ( sqrt(2*pi) * sigma );
+
+for i = sz + 1 : m - sz
+    for j = sz + 1 : n -sz
+        if labelImg(i,j) >= 0
+            continue;
+        end
+        
+        labels_neighbor = labelImg( i-sz:i+sz, j-sz:j+sz );
+        directs_neighbor = directMax( i-sz:i+sz, j-sz:j+sz );
+        directIJ = directMax(i,j);
+        
+        idx_band =  filters(:,:,directIJ) > 0 & labels_neighbor > 0 ;
+        labels_band = unique( labels_neighbor( idx_band ) );
+        
+        if isempty(labels_band)
+            if labelImg(i,j) == -1
+                maxLabel = maxLabel + 1;
+                labelImg(i,j) = maxLabel;
+                labelHits(maxLabel) = 1;
             else
-                maxFilter = filters( :, :, max_idx );
-                pred = find( maxFilter > 0 & samLables > 0 );
+                labelImg(i,j) = 0;
+            end
+        else
+            l_LB = length(labels_band);
+            errors = zeros(l_LB, 1);
+            for jj = 1 : l_LB
+                label = labels_band(jj);
+                [X,Y] = find( labels_neighbor == label );
+                D = (X - sz - 1) .^ 2  +  (Y - sz - 1) .^ 2;
                 
-                if( isempty( pred ) )
-                    labels(i,j) = nextLabel;
-                    nextLabel = nextLabel + 1;
+                Dlen = length(D);
+                [~,idx_a] = sort( D, 'ascend' );
+                for jjj = 1 : Dlen
+                    idx = idx_a(jjj);
+                    DD = D * 0;
+                    DD(jjj) = directMax( X(idx), Y(idx) ) - directIJ;
+                end
+                errors(jj) = sum( sum( (DD .^ 2) .* GX(1:Dlen) ) );
+                errors(jj) = errors(jj) / sum( GX(1:Dlen) ) * D( idx_a(1) );
+            end
+            
+            [minError,idx] = min(errors);
+            if minError < bendError
+                label = labels_band(idx);
+                labelImg(i,j) = label;
+                labelHits(label) = labelHits(label) + 1;
+            else
+                if labelImg(i,j) == -1
+                    maxLabel = maxLabel + 1;
+                    labelImg(i,j) = maxLabel;
+                    labelHits(maxLabel) = 1;
                 else
-                    predLables = samLables( pred );
-                    labels(i,j) = mode( predLables );
+                    labelImg(i,j) = 0;
                 end
             end
         end
+        
     end
 end
 
+labelHits = labelHits(1:maxLabel);
+idx =  1:length(labelHits);
+for badLabel = idx( labelHits < hitsThresh )
+    labelImg( labelImg == badLabel ) = 0;
 end
+labels = idx( labelHits >= hitsThresh );
+
+end
+
 
 function filters = getLDE( sz,d, orientations )
     all_theta = orientations;
