@@ -1,6 +1,7 @@
 function enhI = vesselEnhanceLDE(param)
 %VESSELENHANCELDE Enhance the vessels via LDE
 
+origin = param.origin;
 I     = param.Img;                      %-- original signal
 theta = param.detector_orientation;     %-- orientation space for detectors    
 sigma = 1;                    %-- scale space
@@ -8,6 +9,12 @@ k     = param.offset_factor;            %-- d = k*sigma
 
 d = k*sigma;
 enhI = LDE(I,theta,d,sigma);
+
+eg = edge( origin, 'sobel' );
+str = strel( 'disk', 20 );
+mask = imclose( eg, str );
+mask = bwareaopen( mask, 5000 );
+enhI = enhI .* mask;
 
 end
 

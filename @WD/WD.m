@@ -12,6 +12,7 @@ classdef WD
         enhI = vesselEnhanceLDE(param);
         
         function enImg = contrastEnhance( inImg )
+            param_LDE.origin = inImg;
             param_LDE.Img = WD.enhance( inImg, 5000 );
             param_LDE.detector_orientation  = -90:15:90;
             param_LDE.offset_factor         = 0.6;
