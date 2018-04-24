@@ -9,13 +9,10 @@ classdef WD
     end
     
     methods( Static )
-        enhI = vesselEnhanceLDE(param);
+        [labelImg, labels] = vesselGrowing( orImg, enImg )
         
         function enImg = contrastEnhance( inImg )
-            param_LDE.Img = WD.enhance( inImg, 5000 );
-            param_LDE.detector_orientation  = -90:15:90;
-            param_LDE.offset_factor         = 0.6;
-            enImg = WD.vesselEnhanceLDE( param_LDE );
+            enImg = WD.enhance( inImg, 5000 );
         end
         
     end

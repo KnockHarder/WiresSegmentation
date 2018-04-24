@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 07-Apr-2018 12:56:09
+% Last Modified by GUIDE v2.5 24-Apr-2018 15:07:30
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -59,9 +59,13 @@ handles.output = hObject;
 handles.colImg = [];
 handles.inImg = [];
 handles.enImg = [];
+handles.labelImg = [];
+handles.labels = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
+set( handles.vesselGrowing, 'enable', 'off' );
+set( handles.labelMenu, 'enable', 'off' );
 
 % Update handles structure
 guidata(hObject, handles);
@@ -100,11 +104,15 @@ end
 handles.colImg = colImg;
 handles.inImg = inImg;
 handles.enImg = inImg;
+handles.labelImg = [];
+handles.labels = [];
 handles.rstImg = [];
 
 set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
 set( handles.contrastEnhance, 'enable', 'on' );
+set( handles.vesselGrowing, 'enable', 'off' );
+set( handles.labelMenu, 'enable', 'off' );
 set( handles.currentState, 'String','Ready for processing' );
 guidata(hObject, handles);
 
@@ -206,6 +214,7 @@ end
 set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
+set( handles.vesselGrowing, 'enable', 'on' );
 guidata(hObject, handles);
 
 
@@ -225,3 +234,64 @@ function vesselDark_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of vesselDark
+
+
+% --- Executes on button press in vesselGrowing.
+function vesselGrowing_Callback(hObject, eventdata, handles)
+% hObject    handle to vesselGrowing (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+[handles.labelImg, handles.labels] = WD.vesselGrowing( handles.inImg, handles.enImg );
+handles.rstImg = label2rgb( handles.labelImg, ...
+    @jet, [.5, .5, .5] );
+
+set(handles.disOption,'Value',3);
+disOption_Callback(hObject, eventdata, handles);
+set(handles.currentState,'String','Vessel Cluster is done');
+set(handles.labelMenu, 'String', [0:length(handles.labels)] );
+set(handles.labelMenu, 'value', 1 );
+set(handles.labelMenu, 'enable', 'on' );
+guidata(hObject, handles);
+
+
+% --- Executes on selection change in labelMenu.
+function labelMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to labelMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns labelMenu contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from labelMenu
+label_idx = get( handles.labelMenu, 'value') - 1;
+if label_idx ~= 0
+    label = handles.labels(label_idx);
+else
+    label = 0;
+end
+
+labelImg = handles.labelImg;
+handles.rstImg = label2rgb( labelImg, @jet, [.5, .5, .5] );
+if( label ~= 0 )
+    ind = find( labelImg == label );
+    [X,Y] = ind2sub( size(labelImg), ind );
+    
+    for i = 1 : length(ind)
+        handles.rstImg( X(i), Y(i), : ) = [255, 0, 0];
+    end
+end
+set(handles.disOption,'Value',3);
+disOption_Callback(hObject, eventdata, handles);
+guidata(hObject, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function labelMenu_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to labelMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
