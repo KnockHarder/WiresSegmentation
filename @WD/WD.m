@@ -9,7 +9,7 @@ classdef WD
     end
     
     methods( Static )
-        [labelImg, labels] = vesselCluster( inImg )
+        [labelImg, labels] = vesselCluster( orImg, enImg )
         
         function enImg = contrastEnhance( inImg )
             enImg = WD.enhance( inImg, 5000 );

@@ -1,9 +1,9 @@
-function [labelImg, labels] = vesselCluster( inImg )
+function [labelImg, labels] = vesselCluster( oriImg, enImg )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
-assert( ndims(inImg) == 2 );
+assert( ndims(enImg) == 2 );
 
-I = inImg;
+I = enImg;
 [m, n] = size( I );
 
 all_theta = -90:15:90;
@@ -19,15 +19,16 @@ end
 variances = var(evidences, 1, 3);
 variances = variances * l_theta;
 [maxEvi, directMax] = max(evidences, [], 3);
+weightImg = oriImg .* maxEvi;
 
 labelImg = zeros(m,n);
 labelImg( variances > varTresh ) = -1;
-labelImg( variances <= varTresh & maxEvi > 0.1 ) = -2;
-
+labelImg( variances <= varTresh & weightImg > 0.1 ) = -2;
+ 
 maxLabel = 0;
 labelHits = zeros(m*n, 1);
-hitsThresh = 20;
-bendError = 25;
+hitsThresh = 50;
+bendError = 10;
 
 labelImg( 1:sz, : ) = 0;
 labelImg( :, 1:sz ) = 0;
@@ -35,8 +36,8 @@ labelImg( m-sz+1:m, : ) = 0;
 labelImg( :, n-sz+1:n ) = 0;
 
 sigma = 1;
-X = 1 : (2 * sz + 1) ^ 2;
-GX = exp( -(X.^2) / (2*sigma^2) ) / ( sqrt(2*pi) * sigma );
+[X,Y] = meshgrid(-sz:sz);
+G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
 
 for i = sz + 1 : m - sz
     for j = sz + 1 : n -sz
@@ -46,54 +47,58 @@ for i = sz + 1 : m - sz
         
         labels_neighbor = labelImg( i-sz:i+sz, j-sz:j+sz );
         directs_neighbor = directMax( i-sz:i+sz, j-sz:j+sz );
-        directIJ = directMax(i,j);
+        labelIJ = labels_neighbor( sz+1, sz+1 );
+        directIJ = directs_neighbor( sz+1, sz+1 );
         
         idx_band =  filters(:,:,directIJ) > 0 & labels_neighbor > 0 ;
         labels_band = unique( labels_neighbor( idx_band ) );
         
         if isempty(labels_band)
-            if labelImg(i,j) == -1
+            if labelIJ == -1
                 maxLabel = maxLabel + 1;
-                labelImg(i,j) = maxLabel;
+                labels_neighbor( sz+1, sz+1 ) = maxLabel;
                 labelHits(maxLabel) = 1;
             else
-                labelImg(i,j) = 0;
+                labels_neighbor( sz+1, sz+1 ) = 0;
             end
         else
             l_LB = length(labels_band);
             errors = zeros(l_LB, 1);
             for jj = 1 : l_LB
                 label = labels_band(jj);
-                [X,Y] = find( labels_neighbor == label );
-                D = (X - sz - 1) .^ 2  +  (Y - sz - 1) .^ 2;
+                mask = labels_neighbor == label;
+                Gmask = G .* mask;
+                Gmask = Gmask / sum( sum(G) );
+                Dmask = directs_neighbor .* mask;
                 
-                Dlen = length(D);
-                [~,idx_a] = sort( D, 'ascend' );
-                for jjj = 1 : Dlen
-                    idx = idx_a(jjj);
-                    DD = D * 0;
-                    DD(jjj) = directMax( X(idx), Y(idx) ) - directIJ;
-                end
-                errors(jj) = sum( sum( (DD .^ 2) .* GX(1:Dlen) ) );
-                errors(jj) = errors(jj) / sum( GX(1:Dlen) ) * D( idx_a(1) );
+                errors(jj) = sum( sum( (Dmask - directIJ).^2 .* Gmask ) );
             end
             
             [minError,idx] = min(errors);
             if minError < bendError
                 label = labels_band(idx);
-                labelImg(i,j) = label;
+                labels_neighbor( sz+1, sz+1 ) = label;
                 labelHits(label) = labelHits(label) + 1;
+                
+                for idx = idx_band
+                    if labels_neighbor(idx) == -2
+                        labels_neighbor(idx) = label;
+                        directs_neighbor(idx) = directIJ;
+                    end
+                end
             else
-                if labelImg(i,j) == -1
+                if labelIJ == -1
                     maxLabel = maxLabel + 1;
-                    labelImg(i,j) = maxLabel;
+                    labels_neighbor( sz+1, sz+1 ) = maxLabel;
                     labelHits(maxLabel) = 1;
                 else
-                    labelImg(i,j) = 0;
+                    labels_neighbor( sz+1, sz+1 ) = 0;
                 end
             end
         end
         
+        labelImg( i-sz:i+sz, j-sz:j+sz ) = labels_neighbor;
+        directMax( i-sz:i+sz, j-sz:j+sz ) = directs_neighbor;
     end
 end
 
