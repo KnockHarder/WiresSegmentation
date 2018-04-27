@@ -241,13 +241,25 @@ function vesselGrowing_Callback(hObject, eventdata, handles)
 % hObject    handle to vesselGrowing (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 [handles.labelImg, handles.labels] = WD.vesselGrowing( handles.inImg, handles.enImg );
-handles.rstImg = label2rgb( handles.labelImg, ...
-    @jet, [.5, .5, .5] );
+colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
+colorI = im2double( colorI );
+
+labelImg = handles.labelImg;
+mask = labelImg == 0;
+bkgImg = handles.inImg .* mask * 0.5;
+[m,n] = size(labelImg);
+grayImg = zeros( m,n,3 );
+for i = 1 : 3
+    grayImg(:,:,i) = bkgImg;
+end
+rstImg = imadd( grayImg, colorI );
+handles.rstImg = im2uint8( rstImg );
 
 set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
-set(handles.currentState,'String','Vessel Cluster is done');
+set(handles.currentState,'String','Vessel Growing is done');
 set(handles.labelMenu, 'String', [0:length(handles.labels)] );
 set(handles.labelMenu, 'value', 1 );
 set(handles.labelMenu, 'enable', 'on' );
@@ -269,14 +281,28 @@ else
     label = 0;
 end
 
+colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
+colorI = im2double( colorI );
 labelImg = handles.labelImg;
-handles.rstImg = label2rgb( labelImg, @jet, [.5, .5, .5] );
+mask = labelImg == 0;
+bkgImg = handles.inImg .* mask * 0.5;
+[m,n] = size(labelImg);
+grayImg = zeros( m,n,3 );
+for i = 1 : 3
+    grayImg(:,:,i) = bkgImg;
+end
+rstImg = imadd( grayImg, colorI );
+handles.rstImg = im2uint8( rstImg );
 if( label ~= 0 )
     ind = find( labelImg == label );
     [X,Y] = ind2sub( size(labelImg), ind );
     
     for i = 1 : length(ind)
         handles.rstImg( X(i), Y(i), : ) = [255, 0, 0];
+        handles.rstImg( X(i)-1, Y(i), : ) = [255, 0, 0];
+        handles.rstImg( X(i)+1, Y(i), : ) = [255, 0, 0];
+        handles.rstImg( X(i), Y(i)-1, : ) = [255, 0, 0];
+        handles.rstImg( X(i), Y(i)+1, : ) = [255, 0, 0];
     end
 end
 set(handles.disOption,'Value',3);

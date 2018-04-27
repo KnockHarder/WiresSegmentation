@@ -24,10 +24,11 @@ function [labelImg, labels] = vesselGrowing( oriImg, enImg )
     labelImg = zeros(m,n);
     labelImg( variances > varTresh ) = -1;
     labelImg( variances <= varTresh & weightImg > 0.1 ) = -2;
+    
+%     figure, imshow( imresize( label2rgb( labelImg * -1, @jet, [.5,.5,.5] ), 0.5 ) );
 
     hitsThresh = 10;
     smooth = 0.25;
-    k_error = 0.2;
     sigma = 2;
     width = 2;
     filters_band = filters( sz+1-width:sz+1+width, sz+1-width:sz+1+width, : );
@@ -44,7 +45,7 @@ function [labelImg, labels] = vesselGrowing( oriImg, enImg )
     maxp = sum( sum( labelImg < 0 ) );
 
 %     [x,y] = getNextPoint( labelImg, 1, 1, -1 );
-    count = 1;
+    count = 0;
     [x,y] = find( labelImg == -1, 1 );
     x_pre = -1; y_pre = -1;
     labelImg(x,y) = 1;
@@ -52,9 +53,9 @@ function [labelImg, labels] = vesselGrowing( oriImg, enImg )
     labelHits(maxLabel) = 0;
     while ~isempty(x)
         count = count + 1;
-         if rem( count, 1000 ) == 0
-             count, 
-         end
+        if rem( count, 1000 ) == 0
+            count, 
+        end
         assert( count <= maxp );
         
         labelImg(x,y) = maxLabel;
@@ -65,63 +66,64 @@ function [labelImg, labels] = vesselGrowing( oriImg, enImg )
 
         mask = labels_nei < 0;
         mask = mask .* masks_band(:,:,directIJ);
+        D = directs_nei + mask * 0.5;
+        D = abs(D - directIJ);
         
         while ~isempty( find(mask > 0, 1) )
-            D = abs(directs_nei - directIJ);
             errors = mask .* D .* G ;
             errors( errors == 0 ) = inf;
             [minCol, X] = min( errors );
-            [minError,y_end] = min( minCol );
+            [~,y_end] = min( minCol );
             x_end = X(y_end);
             x_next = x + ( x_end - width - 1);
             y_next = y + ( y_end - width - 1 );
             assert( labels_nei(x_end,y_end) == labelImg(x_next,y_next) );
             
-            if minError > l_theta * k_error
-                mask = [];
+            if isequal( [x_pre,y_pre], [-1, -1] )
+                theta = 0;
             else
-                if isequal( [x_pre,y_pre], [-1, -1] )
-                    theta = 0;
-                else
-                    A = [x,y] - [x_pre,y_pre];
-                    A = A / sqrt( A(1)^2 + A(2)^2 );
-                    B = [x_next,y_next] - [x,y];
-                    B = B / sqrt( B(1)^2 + B(2)^2 );
-                    theta = acos( A * B' );
+                A = [x,y] - [x_pre,y_pre];
+                A = A / sqrt( A(1)^2 + A(2)^2 );
+                B = [x_next,y_next] - [x,y];
+                B = B / sqrt( B(1)^2 + B(2)^2 );
+                theta = acos( A * B' );
+            end
+
+            if theta < smooth * pi
+                if labelImg(x_next, y_next) < -1
+                    directMax(x_next, y_next) = directMax(x,y);
                 end
 
-                if theta < smooth * pi
-                    dx = x_next - x;
-                    dy = y_next - y;
+                dx = x_next - x;
+                dy = y_next - y;
 
-                    if abs(dx) > abs(dy)
-                        k = dy / dx;
-                        for i_x = x+1 : x_next-1
-                            i_y = k * (i_x - x ) + y;
-                            i_y = floor( i_y + 0.5 );
-                            if labelImg(i_x, i_y) <= 0
-                                labelImg(i_x, i_y) = maxLabel;
-                                labelHits(maxLabel) = labelHits(maxLabel) + 1;
-                            end
-                        end
-                    else
-                        k = dx / dy;
-                        for i_y = y+1 : y_next-1
-                            i_x = k * (i_y - y ) + x;
-                            i_x = floor( i_x + 0.5 );
-                            if( labelImg(i_x, i_y) <= 0 )
-                                labelImg(i_x, i_y) = maxLabel;
-                                labelHits(maxLabel) = labelHits(maxLabel) + 1;
-                            end
+                if abs(dx) > abs(dy)
+                    k = dy / dx;
+                    for i_x = x+1 : x_next-1
+                        i_y = k * (i_x - x ) + y;
+                        i_y = floor( i_y + 0.5 );
+                        if labelImg(i_x, i_y) <= 0
+                            labelImg(i_x, i_y) = maxLabel;
+                            labelHits(maxLabel) = labelHits(maxLabel) + 1;
                         end
                     end
-                    
-                    x_pre = x ;  y_pre = y ;
-                    x = x_next;  y = y_next;
-                    break;
                 else
-                    mask( x_end, y_end ) = 0;
+                    k = dx / dy;
+                    for i_y = y+1 : y_next-1
+                        i_x = k * (i_y - y ) + x;
+                        i_x = floor( i_x + 0.5 );
+                        if( labelImg(i_x, i_y) <= 0 )
+                            labelImg(i_x, i_y) = maxLabel;
+                            labelHits(maxLabel) = labelHits(maxLabel) + 1;
+                        end
+                    end
                 end
+
+                x_pre = x ;  y_pre = y ;
+                x = x_next;  y = y_next;
+                break;
+            else
+                mask( x_end, y_end ) = 0;
             end
         end
         
@@ -184,28 +186,28 @@ function filters = getLDE( sz,d, orientations )
     end
 end
 
-function [x_next,y_next] = getNextPoint( labelImg, x, y, label )
-    assert( ndims(labelImg) == 2 );
-    [m,n] = size( labelImg );
-    assert( x <=m  &  y <= n );
-
-    x_next = x + 1;
-    y_next = y;
-    while 1
-        if x_next > m
-            x_next = 1;
-            y_next = y_next + 1;
-        end
-        if y_next > n
-            x_next = [];
-            y_next = [];
-            break;
-        end
-
-        if labelImg(x_next,y_next) == label
-            break;
-        else
-            x_next = x_next + 1;
-        end
-    end
-end
+% function [x_next,y_next] = getNextPoint( labelImg, x, y, label )
+%     assert( ndims(labelImg) == 2 );
+%     [m,n] = size( labelImg );
+%     assert( x <=m  &  y <= n );
+% 
+%     x_next = x + 1;
+%     y_next = y;
+%     while 1
+%         if x_next > m
+%             x_next = 1;
+%             y_next = y_next + 1;
+%         end
+%         if y_next > n
+%             x_next = [];
+%             y_next = [];
+%             break;
+%         end
+% 
+%         if labelImg(x_next,y_next) == label
+%             break;
+%         else
+%             x_next = x_next + 1;
+%         end
+%     end
+% end
