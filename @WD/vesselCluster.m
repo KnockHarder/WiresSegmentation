@@ -38,6 +38,7 @@ labelImg( :, n-sz+1:n ) = 0;
 sigma = 1;
 [X,Y] = meshgrid(-sz:sz);
 G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
+G = 1 - G;
 
 for i = sz + 1 : m - sz
     for j = sz + 1 : n -sz
