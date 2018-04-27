@@ -9,7 +9,7 @@ classdef WD
     end
     
     methods( Static )
-        [labelImg, labels] = vesselGrowing( orImg, enImg )
+        labelImg = localGrowing( grayImg, enImg );
         
         function enImg = contrastEnhance( inImg )
             enImg = WD.enhance( inImg, 5000 );

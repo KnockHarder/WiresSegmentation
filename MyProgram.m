@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 27-Apr-2018 18:36:09
+% Last Modified by GUIDE v2.5 27-Apr-2018 22:48:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -60,13 +60,12 @@ handles.colImg = [];
 handles.inImg = [];
 handles.enImg = [];
 handles.labelImg = [];
-handles.labels = [];
 handles.cropRec = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
 set( handles.doCrop, 'enable', 'off' );
-set( handles.vesselGrowing, 'enable', 'off' );
+set( handles.localGrowing, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 
 % Update handles structure
@@ -107,7 +106,6 @@ handles.colImg = colImg;
 handles.inImg = inImg;
 handles.enImg = inImg;
 handles.labelImg = [];
-handles.labels = [];
 handles.rstImg = [];
 
 [m,n] = size( inImg );
@@ -117,7 +115,7 @@ set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
 set( handles.contrastEnhance, 'enable', 'on' );
 set( handles.doCrop, 'enable', 'off' );
-set( handles.vesselGrowing, 'enable', 'off' );
+set( handles.localGrowing, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 set( handles.currentState, 'String','Ready for processing' );
 guidata(hObject, handles);
@@ -221,7 +219,7 @@ set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
 set( handles.doCrop, 'enable', 'on' );
-set( handles.vesselGrowing, 'enable', 'on' );
+set( handles.localGrowing, 'enable', 'on' );
 guidata(hObject, handles);
 
 
@@ -243,13 +241,13 @@ function vesselDark_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of vesselDark
 
 
-% --- Executes on button press in vesselGrowing.
-function vesselGrowing_Callback(hObject, eventdata, handles)
-% hObject    handle to vesselGrowing (see GCBO)
+% --- Executes on button press in localGrowing.
+function localGrowing_Callback(hObject, eventdata, handles)
+% hObject    handle to localGrowing (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.currentState,'String',...
-    'A little time is needed to do vesselGrowing, be paitient');
+    'A little time is needed to do localGrowing, be paitient');
 guidata(hObject, handles);
 drawnow;
 
@@ -259,11 +257,11 @@ mask = zeros( m, n );
 mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
-[handles.labelImg, handles.labels] = WD.vesselGrowing( inImg, enImg );
-colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
-colorI = im2double( colorI );
+labelImg = WD.localGrowing( inImg, enImg );
+% assert( max(max(labelImg)) == length(unique(labelImg)) - 1 );
 
-labelImg = handles.labelImg;
+colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
+colorI = im2double( colorI );
 mask = labelImg == 0;
 bkgImg = handles.inImg .* mask * 0.5;
 grayImg = zeros( m,n,3 );
@@ -271,12 +269,13 @@ for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
 end
 rstImg = imadd( grayImg, colorI );
+handles.labelImg = labelImg;
 handles.rstImg = im2uint8( rstImg );
 
 set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Vessel Growing is done');
-set(handles.labelMenu, 'String', [0:length(handles.labels)] );
+set(handles.labelMenu, 'String', 0:max(max(labelImg)) );
 set(handles.labelMenu, 'value', 1 );
 set(handles.labelMenu, 'enable', 'on' );
 guidata(hObject, handles);
@@ -290,12 +289,7 @@ function labelMenu_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns labelMenu contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from labelMenu
-label_idx = get( handles.labelMenu, 'value') - 1;
-if label_idx ~= 0
-    label = handles.labels(label_idx);
-else
-    label = 0;
-end
+label = get( handles.labelMenu, 'value') - 1;
 
 colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
 colorI = im2double( colorI );
@@ -344,7 +338,8 @@ function doCrop_Callback(hObject, eventdata, handles)
 % hObject    handle to doCrop (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-set( handles.vesselGrowing, 'enable', 'off' );
+disOption_Callback(hObject, eventdata, handles );
+set( handles.localGrowing, 'enable', 'off' );
 set( handles.currentState, 'String', ...
     'If everything is done, please double-left-click' );
 guidata( hObject, handles );
@@ -358,7 +353,10 @@ end
 if ~isempty(rec)    
     handles.cropRec = round( rec );
     imshow( cropImg, 'parent', handles.figAxis );
+    set( handles.currentState, 'String', 'Area select is done' );
+else
+    set( handles.currentState, 'String', 'Area select has been canceled' );
 end
-set( handles.currentState, 'String', 'Area select is done' );
-set( handles.vesselGrowing, 'enable', 'on' );
+
+set( handles.localGrowing, 'enable', 'on' );
 guidata( hObject, handles );
