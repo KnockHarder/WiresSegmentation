@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 24-Apr-2018 15:07:30
+% Last Modified by GUIDE v2.5 27-Apr-2018 18:36:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -61,9 +61,11 @@ handles.inImg = [];
 handles.enImg = [];
 handles.labelImg = [];
 handles.labels = [];
+handles.cropRec = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
+set( handles.doCrop, 'enable', 'off' );
 set( handles.vesselGrowing, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 
@@ -94,9 +96,9 @@ function loadImg_Callback(hObject, eventdata, handles)
 try
     [colImg,inImg,~, ~] = StdIP.readImg2D(-1);
     inImg = inImg/max(inImg(:));
-catch ME
+catch 
     set( handles.currentState, 'String', ...
-        strcat('Failed to load,erro code: ',ME.identifier ) );
+        'Image is not loaded rightly, check and try again' );
     return;
 end
 
@@ -108,9 +110,13 @@ handles.labelImg = [];
 handles.labels = [];
 handles.rstImg = [];
 
+[m,n] = size( inImg );
+handles.cropRec = [1, 1, n, m];
+
 set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
 set( handles.contrastEnhance, 'enable', 'on' );
+set( handles.doCrop, 'enable', 'off' );
 set( handles.vesselGrowing, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 set( handles.currentState, 'String','Ready for processing' );
@@ -214,6 +220,7 @@ end
 set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
+set( handles.doCrop, 'enable', 'on' );
 set( handles.vesselGrowing, 'enable', 'on' );
 guidata(hObject, handles);
 
@@ -241,15 +248,24 @@ function vesselGrowing_Callback(hObject, eventdata, handles)
 % hObject    handle to vesselGrowing (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+set(handles.currentState,'String',...
+    'A little time is needed to do vesselGrowing, be paitient');
+guidata(hObject, handles);
+drawnow;
 
-[handles.labelImg, handles.labels] = WD.vesselGrowing( handles.inImg, handles.enImg );
+[m,n] = size( handles.inImg );
+rec = handles.cropRec;
+mask = zeros( m, n );
+mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
+inImg = handles.inImg .* mask;
+enImg = handles.enImg .* mask;
+[handles.labelImg, handles.labels] = WD.vesselGrowing( inImg, enImg );
 colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
 colorI = im2double( colorI );
 
 labelImg = handles.labelImg;
 mask = labelImg == 0;
 bkgImg = handles.inImg .* mask * 0.5;
-[m,n] = size(labelImg);
 grayImg = zeros( m,n,3 );
 for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
@@ -321,3 +337,28 @@ function labelMenu_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in doCrop.
+function doCrop_Callback(hObject, eventdata, handles)
+% hObject    handle to doCrop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set( handles.vesselGrowing, 'enable', 'off' );
+set( handles.currentState, 'String', ...
+    'If everything is done, please double-left-click' );
+guidata( hObject, handles );
+
+disImg = getimage( handles.figAxis );
+if isempty(disImg)
+    return;
+end
+
+[cropImg,rec] = imcrop( disImg );
+if ~isempty(rec)    
+    handles.cropRec = round( rec );
+    imshow( cropImg, 'parent', handles.figAxis );
+end
+set( handles.currentState, 'String', 'Area select is done' );
+set( handles.vesselGrowing, 'enable', 'on' );
+guidata( hObject, handles );

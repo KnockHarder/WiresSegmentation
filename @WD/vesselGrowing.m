@@ -42,21 +42,21 @@ function [labelImg, labels] = vesselGrowing( oriImg, enImg )
     labelImg( m-width+1:m, : ) = 0;
     labelImg( :, n-width+1:n ) = 0;
     labelHits = zeros(m*n, 1);
-    maxp = sum( sum( labelImg < 0 ) );
-
+%     maxp = sum( sum( labelImg < 0 ) );
+% 
 %     [x,y] = getNextPoint( labelImg, 1, 1, -1 );
-    count = 0;
+%     count = 0;
     [x,y] = find( labelImg == -1, 1 );
     x_pre = -1; y_pre = -1;
     labelImg(x,y) = 1;
     maxLabel = 1;
     labelHits(maxLabel) = 0;
     while ~isempty(x)
-        count = count + 1;
-        if rem( count, 1000 ) == 0
-            count, 
-        end
-        assert( count <= maxp );
+%         count = count + 1;
+%         if rem( count, 1000 ) == 0
+%             count, 
+%         end
+%         assert( count <= maxp );
         
         labelImg(x,y) = maxLabel;
         labelHits(maxLabel) = labelHits(maxLabel) + 1;
