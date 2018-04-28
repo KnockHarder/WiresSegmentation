@@ -1,11 +1,14 @@
 function labelImg = localGrowing( grayImg, enImg )
-    all_theta = -90:15:90;
-    [labelImg, endPoints, directs] = vesselGrowing( grayImg, enImg, all_theta );
+    step = 6;
+    [labelImg, ~, ~] = vesselGrowing( grayImg, enImg, step );
 end
 
-function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, all_theta )
+function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
+    assert( rem(90,step) == 0 );
+    inc = 90 / step;
+    all_theta = inc:inc:180;
     
     I = enImg;
     [m, n] = size( I );
@@ -18,11 +21,13 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, all_thet
         evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
     end
 
-    [maxEvi, directMax] = max(evidences, [], 3);
-    weightImg = oriImg .* maxEvi;
-
+    [maxEvi, directV] = max(evidences, [], 3);
+    directH = rem( directV+step, step*2 );
+    directH(directH == 0) = step*2;
+    
     variances = var(evidences, 1, 3);
     variances = variances * l_theta;
+    weightImg = oriImg .* maxEvi;
     labelImg = zeros(m,n);
     labelImg( variances > varTresh ) = -1;
     labelImg( variances <= varTresh & weightImg > 0.1 ) = -2;
@@ -64,17 +69,20 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, all_thet
         
         labelImg(x,y) = maxLabel;
         labelHits(maxLabel) = labelHits(maxLabel) + 1;
-        directIJ = directMax( x, y );
+        dV = directV( x, y );
+        dH = directH( x, y );
         labels_nei = labelImg( x-width:x+width, y-width:y+width );
-        directs_nei = directMax( x-width:x+width, y-width:y+width );
+        dV_nei = directV( x-width:x+width, y-width:y+width );
+        dH_nei = directH( x-width:x+width, y-width:y+width );
 
         mask = labels_nei < 0;
-        mask = mask .* masks_band(:,:,directIJ);
-        D = directs_nei + mask * 0.5;
-        D = abs(D - directIJ);
+        mask = mask .* masks_band(:,:,dV);
+        diffV = abs(dV_nei + 0.5 - dV);
+        diffH = abs(dH_nei + 0.5 - dH);
+        diff = min( diffV, diffH );
         
         while ~isempty( find(mask > 0, 1) )
-            errors = mask .* D .* G ;
+            errors = mask .* diff .* G ;
             errors( errors == 0 ) = inf;
             [minCol, X] = min( errors );
             [~,y_end] = min( minCol );
@@ -95,7 +103,8 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, all_thet
 
             if theta < smooth * pi
                 if labelImg(x_next, y_next) < -1
-                    directMax(x_next, y_next) = directMax(x,y);
+                    directV(x_next, y_next) = directV(x,y);
+                    directH(x_next, y_next) = directH(x,y);
                 end
 
                 dx = x_next - x;
@@ -160,7 +169,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, all_thet
         labelImg( labelImg == labels(i) ) = i;
     end
     
-    directs = directMax;
+    directs = [];
 end
 
 function filters = getLDE( sz,d, orientations )
