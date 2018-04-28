@@ -1,9 +1,11 @@
 function labelImg = localGrowing( grayImg, enImg )
     step = 6;
-    [labelImg, ~, ~] = vesselGrowing( grayImg, enImg, step );
+    [labelImg, lines, ~, ~] = vesselGrowing( grayImg, enImg, step, 20 );
+
+    labelImg( labelImg < 0 ) = 1;
 end
 
-function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
+function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, step, minlen )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
     assert( rem(90,step) == 0 );
@@ -34,10 +36,10 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
     
 %     figure, imshow( imresize( label2rgb( labelImg * -1, @jet, [.5,.5,.5] ), 0.5 ) );
 
-    hitsThresh = 10;
+    hitsThresh = minlen;
     smooth = 0.25;
-    sigma = 2;
-    width = 2;
+    sigma = 1;
+    width = sz;
     filters_band = filters( sz+1-width:sz+1+width, sz+1-width:sz+1+width, : );
     masks_band = filters_band > 0;
     [X,Y] = meshgrid(-width:width);
@@ -49,7 +51,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
     labelImg( m-width+1:m, : ) = 0;
     labelImg( :, n-width+1:n ) = 0;
     labelHits = zeros(m*n, 1);
-    endPoints = zeros(m*n, 2, 2 );
+    lines = cell( m*n, 1 );
 %     maxp = sum( sum( labelImg < 0 ) );
 % 
 %     [x,y] = getNextPoint( labelImg, 1, 1, -1 );
@@ -59,7 +61,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
     labelImg(x,y) = 1;
     maxLabel = 1;
     labelHits(maxLabel) = 0;
-    endPoints(maxLabel, 1, : ) = [x,y];
+    lines{maxLabel} = cell( m+n, 1 );
     while ~isempty(x)
 %         count = count + 1;
 %         if rem( count, 1000 ) == 0
@@ -69,6 +71,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
         
         labelImg(x,y) = maxLabel;
         labelHits(maxLabel) = labelHits(maxLabel) + 1;
+        lines{maxLabel}{labelHits(maxLabel)} = [x,y];
         dV = directV( x, y );
         dH = directH( x, y );
         labels_nei = labelImg( x-width:x+width, y-width:y+width );
@@ -77,12 +80,14 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
 
         mask = labels_nei < 0;
         mask = mask .* masks_band(:,:,dV);
-        diffV = abs(dV_nei + 0.5 - dV);
-        diffH = abs(dH_nei + 0.5 - dH);
+        diffV = dV_nei + 0.5 - dV;
+        diffV = abs( floor( diffV + sign(diffV) ) );
+        diffH = dH_nei + 0.5 - dH;
+        diffH = abs( floor( diffH + sign(diffH) ) );
         diff = min( diffV, diffH );
         
         while ~isempty( find(mask > 0, 1) )
-            errors = mask .* diff .* G ;
+            errors = mask .* (1-G) .* (diff.^2);
             errors( errors == 0 ) = inf;
             [minCol, X] = min( errors );
             [~,y_end] = min( minCol );
@@ -118,6 +123,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
                         if labelImg(i_x, i_y) <= 0
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
+                            lines{maxLabel}{labelHits(maxLabel)} = [i_x, i_y];
                         end
                     end
                 else
@@ -128,6 +134,7 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
                         if( labelImg(i_x, i_y) <= 0 )
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
+                            lines{maxLabel}{labelHits(maxLabel)}= [i_x, i_y];
                         end
                     end
                 end
@@ -141,35 +148,29 @@ function [labelImg, endPoints, directs] = vesselGrowing( oriImg, enImg, step )
         end
         
         if isempty( find(mask > 0, 1) )
-            endPoints(maxLabel, 2, : ) = [x,y];
-%             [x,y] = getNextPoint( labelImg, x, y, -1 );
+            lines{maxLabel} = lines{maxLabel}( 1:labelHits(maxLabel) );
             [x,y] = find( labelImg == -1, 1 );
             x_pre = -1;  y_pre = -1;
             maxLabel = maxLabel + 1;
             labelHits(maxLabel) = 0;
-            if ~isempty(x)
-                endPoints(maxLabel, 1, : ) = [x,y];
-            end
+            lines{maxLabel} = cell( m+n, 1 );
             continue;
         end
     end
 
-    labelImg( labelImg < 0 ) = 0;
-
     labelHits = labelHits(1:maxLabel);
+    lines = lines(1:maxLabel);
     labels = find( labelHits >= hitsThresh );
     badLabels = find( labelHits < hitsThresh );
     
-    endPoints = endPoints( labelHits >= hitsThresh );
+    lines = lines( labelHits >= hitsThresh );
     
     for lb = badLabels'
-        labelImg( labelImg == lb ) = 0;
+        labelImg( labelImg == lb ) = -2;
     end
     for i = 1 : length(labels)
         labelImg( labelImg == labels(i) ) = i;
     end
-    
-    directs = [];
 end
 
 function filters = getLDE( sz,d, orientations )
