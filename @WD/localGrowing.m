@@ -4,9 +4,10 @@ function labelImg = localGrowing( grayImg, enImg )
     minlen = 20;
     [labelImg, lines, directH, directV] = vesselGrowing( grayImg, enImg, step, sz, minlen );
     %%%%%%
-%     tempI = labelImg;
-%     tempI( tempI < 0 )  = 0;
-%     figure, imshow( label2rgb(tempI, @jet, [.5,.5,.5]) );
+    labels = length(lines);
+    for i = 1 : labels
+        assert( length(lines{i}) == sum(sum(labelImg == i)) );
+    end
     %%%%%%
     
     [m,n] = size(labelImg);
@@ -132,12 +133,18 @@ function labelImg = localGrowing( grayImg, enImg )
                                 else
                                     dx = x_next - x;
                                     dy = y_next - y;
+                                    delta_x = sign(dx);
+                                    delta_y = sign(dy);
                                     if abs(dx) > abs(dy)
                                         k = dy / dx;
-                                        for i_x = x+1 : x_next-1
+                                        for i_x = x+delta_x :delta_x :x_next-delta_x
                                             i_y = k * (i_x - x ) + y;
                                             i_y = floor( i_y + 0.5 );
                                             if labelImg(i_x, i_y) <= 0
+                                                if labelImg(i_x, i_y) < -1
+                                                    directV(i_x, i_y) = directV(x,y);
+                                                    directH(i_x, i_y) = directH(x,y);
+                                                end
                                                 labelImg(i_x, i_y) = label;
                                                 count_seg(ii) = count_seg(ii) + 1;
                                                 add_seg{ count_seg(ii), ii } = [i_x, i_y];
@@ -145,10 +152,14 @@ function labelImg = localGrowing( grayImg, enImg )
                                         end
                                     else
                                         k = dx / dy;
-                                        for i_y = y+1 : y_next-1
+                                        for i_y = y+delta_y :delta_y :y_next-delta_y
                                             i_x = k * (i_y - y ) + x;
                                             i_x = floor( i_x + 0.5 );
                                             if( labelImg(i_x, i_y) <= 0 )
+                                                if labelImg(i_x, i_y) < -1
+                                                    directV(i_x, i_y) = directV(x,y);
+                                                    directH(i_x, i_y) = directH(x,y);
+                                                end
                                                 labelImg(i_x, i_y) = label;
                                                 count_seg(ii) = count_seg(ii) + 1;
                                                 add_seg{ count_seg(ii), ii } = [i_x, i_y];
@@ -217,26 +228,25 @@ function labelImg = localGrowing( grayImg, enImg )
                             end
                         else
                             A = [x,y] - [x_pre,y_pre];
-                            A = A / sqrt( A(1)^2 + A(2)^2 );
                             B = [x_next,y_next] - [x,y];
-                            B = B / sqrt( B(1)^2 + B(2)^2 );
-                            theta = acos( A * B' );
+                            theta = acos( dot(A,B)/norm(A)/norm(B) );
 
                             if theta < smooth * pi
-                                if labelImg(x_next, y_next) < -1
-                                    directV(x_next, y_next) = directV(x,y);
-                                    directH(x_next, y_next) = directH(x,y);
-                                end
-
                                 dx = x_next - x;
                                 dy = y_next - y;
+                                delta_x = sign(dx);
+                                delta_y = sign(dy);
 
                                 if abs(dx) > abs(dy)
                                     k = dy / dx;
-                                    for i_x = x+1 : x_next-1
+                                    for i_x = x+delta_x :delta_x :x_next-delta_x
                                         i_y = k * (i_x - x ) + y;
                                         i_y = floor( i_y + 0.5 );
                                         if labelImg(i_x, i_y) <= 0
+                                            if labelImg(i_x, i_y) < -1
+                                                directV(i_x, i_y) = directV(x,y);
+                                                directH(i_x, i_y) = directH(x,y);
+                                            end
                                             labelImg(i_x, i_y) = label;
                                             count_seg(ii) = count_seg(ii) + 1;
                                             add_seg{ count_seg(ii), ii } = [i_x, i_y];
@@ -244,20 +254,42 @@ function labelImg = localGrowing( grayImg, enImg )
                                     end
                                 else
                                     k = dx / dy;
-                                    for i_y = y+1 : y_next-1
+                                    for i_y = y+delta_y :delta_y :y_next-delta_y
                                         i_x = k * (i_y - y ) + x;
                                         i_x = floor( i_x + 0.5 );
                                         if( labelImg(i_x, i_y) <= 0 )
+                                            if labelImg(i_x, i_y) < -1
+                                                directV(i_x, i_y) = directV(x,y);
+                                                directH(i_x, i_y) = directH(x,y);
+                                            end
                                             labelImg(i_x, i_y) = label;
                                             count_seg(ii) = count_seg(ii) + 1;
                                             add_seg{ count_seg(ii), ii } = [i_x, i_y];
                                         end
                                     end
                                 end
-                                if norm(x_next-x, y_next-y) > sz
+                                if norm(B) > sz
                                     x_pre = x ;  y_pre = y ;
                                 end
                                 x = x_next;  y = y_next;
+                                
+                                if labelImg(x, y) < -1
+                                    labels_nei = labelImg( x-sz:x+sz, y-sz:y+sz );
+                                    preP = labels_nei == label;
+                                    l_theta = length(all_theta);
+                                    scores = zeros( l_theta, 1 );
+                                    for i = 1 : l_theta
+                                        scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
+                                    end
+                                    [~,dV] = min(scores);
+                                    dH = rem( dV+step, step*2 );
+                                    dH = dH + (dH == 0)*step*2;
+                                    directV(x,y) = dV;
+                                    directH(x,y) = dH;
+                                end
+                                labelImg(x,y) = label;
+                                count_seg(ii) = count_seg(ii) + 1;
+                                add_seg{ count_seg(ii), ii } = [x, y];
                                 break;
                             else
                                 mask( x_end, y_end ) = 0;
@@ -355,7 +387,19 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
 %             count, 
 %         end
 %         assert( count <= maxp );
-        
+        if labelImg(x, y) < -1 && norm(x-x_pre, y-y_pre) >= width
+            labels_nei = labelImg( x-width:x+width, y-width:y+width );
+            preP = labels_nei == maxLabel;
+            scores = zeros( l_theta, 1 );
+            for i = 1 : l_theta
+                scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
+            end
+            [~,dV] = min(scores);
+            dH = rem( dV+step, step*2 );
+            dH = dH + (dH == 0)*step*2;
+            directV(x,y) = dV;
+            directH(x,y) = dH;
+        end
         labelImg(x,y) = maxLabel;
         labelHits(maxLabel) = labelHits(maxLabel) + 1;
         lines{maxLabel}{labelHits(maxLabel)} = [x,y];
@@ -387,27 +431,26 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
                 theta = 0;
             else
                 A = [x,y] - [x_pre,y_pre];
-                A = A / sqrt( A(1)^2 + A(2)^2 );
                 B = [x_next,y_next] - [x,y];
-                B = B / sqrt( B(1)^2 + B(2)^2 );
-                theta = acos( A * B' );
+                theta = acos( dot(A,B)/norm(A)/norm(B) );
             end
 
             if theta < smooth * pi
-                if labelImg(x_next, y_next) < -1
-                    directV(x_next, y_next) = directV(x,y);
-                    directH(x_next, y_next) = directH(x,y);
-                end
-
                 dx = x_next - x;
                 dy = y_next - y;
+                delta_x = sign(dx);
+                delta_y = sign(dy);
 
                 if abs(dx) > abs(dy)
                     k = dy / dx;
-                    for i_x = x+1 : x_next-1
+                    for i_x = x+delta_x :delta_x :x_next-delta_x
                         i_y = k * (i_x - x ) + y;
                         i_y = floor( i_y + 0.5 );
                         if labelImg(i_x, i_y) <= 0
+                            if labelImg(i_x, i_y) < -1
+                                directV(i_x, i_y) = directV(x,y);
+                                directH(i_x, i_y) = directH(x,y);
+                            end
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
                             lines{maxLabel}{labelHits(maxLabel)} = [i_x, i_y];
@@ -415,18 +458,23 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
                     end
                 else
                     k = dx / dy;
-                    for i_y = y+1 : y_next-1
+                    for i_y = y+delta_y :delta_y :y_next-delta_y
                         i_x = k * (i_y - y ) + x;
                         i_x = floor( i_x + 0.5 );
                         if( labelImg(i_x, i_y) <= 0 )
+                            if labelImg(i_x, i_y) < -1
+                                directV(i_x, i_y) = directV(x,y);
+                                directH(i_x, i_y) = directH(x,y);
+                            end
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
                             lines{maxLabel}{labelHits(maxLabel)} = [i_x, i_y];
                         end
                     end
                 end
-
-                x_pre = x ;  y_pre = y ;
+                if  theta == 0 || norm(B) > width
+                    x_pre = x ;  y_pre = y ;
+                end
                 x = x_next;  y = y_next;
                 break;
             else
