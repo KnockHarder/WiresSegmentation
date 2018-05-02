@@ -8,11 +8,14 @@ function labelImg = localGrowing( grayImg, enImg )
     for i = 1 : labels
         assert( length(lines{i}) == sum(sum(labelImg == i)) );
     end
+%     labelImg(labelImg < 0 ) = 0;
+%     return;
     %%%%%%
     
     [m,n] = size(labelImg);
     inc = 90 / step;
     all_theta = inc:inc:180;
+    l_theta = length(all_theta);
     smooth = 0.25;
     filters = getLDE( sz, 0.6, all_theta );
     masks_band = filters > 0;
@@ -141,9 +144,10 @@ function labelImg = localGrowing( grayImg, enImg )
                                             i_y = k * (i_x - x ) + y;
                                             i_y = floor( i_y + 0.5 );
                                             if labelImg(i_x, i_y) <= 0
-                                                if labelImg(i_x, i_y) < -1
-                                                    directV(i_x, i_y) = directV(x,y);
-                                                    directH(i_x, i_y) = directH(x,y);
+                                                if norm(i_x-x_pre, i_y-y_pre) >= sz
+                                                    labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
+                                                    [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                                        adjustDir( labels_nei, label, masks_band, l_theta );
                                                 end
                                                 labelImg(i_x, i_y) = label;
                                                 count_seg(ii) = count_seg(ii) + 1;
@@ -156,9 +160,10 @@ function labelImg = localGrowing( grayImg, enImg )
                                             i_x = k * (i_y - y ) + x;
                                             i_x = floor( i_x + 0.5 );
                                             if( labelImg(i_x, i_y) <= 0 )
-                                                if labelImg(i_x, i_y) < -1
-                                                    directV(i_x, i_y) = directV(x,y);
-                                                    directH(i_x, i_y) = directH(x,y);
+                                                if norm(i_x-x_pre, i_y-y_pre) >= sz
+                                                    labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
+                                                    [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                                        adjustDir( labels_nei, label, masks_band, l_theta );
                                                 end
                                                 labelImg(i_x, i_y) = label;
                                                 count_seg(ii) = count_seg(ii) + 1;
@@ -243,9 +248,10 @@ function labelImg = localGrowing( grayImg, enImg )
                                         i_y = k * (i_x - x ) + y;
                                         i_y = floor( i_y + 0.5 );
                                         if labelImg(i_x, i_y) <= 0
-                                            if labelImg(i_x, i_y) < -1
-                                                directV(i_x, i_y) = directV(x,y);
-                                                directH(i_x, i_y) = directH(x,y);
+                                            if norm(i_x-x_pre, i_y-y_pre) >= sz
+                                                labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
+                                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                                        adjustDir( labels_nei, label, masks_band, l_theta );
                                             end
                                             labelImg(i_x, i_y) = label;
                                             count_seg(ii) = count_seg(ii) + 1;
@@ -258,9 +264,10 @@ function labelImg = localGrowing( grayImg, enImg )
                                         i_x = k * (i_y - y ) + x;
                                         i_x = floor( i_x + 0.5 );
                                         if( labelImg(i_x, i_y) <= 0 )
-                                            if labelImg(i_x, i_y) < -1
-                                                directV(i_x, i_y) = directV(x,y);
-                                                directH(i_x, i_y) = directH(x,y);
+                                            if norm(i_x-x_pre, i_y-y_pre) >= sz
+                                                labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
+                                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                                        adjustDir( labels_nei, label, masks_band, l_theta );
                                             end
                                             labelImg(i_x, i_y) = label;
                                             count_seg(ii) = count_seg(ii) + 1;
@@ -387,18 +394,10 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
 %             count, 
 %         end
 %         assert( count <= maxp );
-        if labelImg(x, y) < -1 && norm(x-x_pre, y-y_pre) >= width
+        if norm(x-x_pre, y-y_pre) >= width
             labels_nei = labelImg( x-width:x+width, y-width:y+width );
-            preP = labels_nei == maxLabel;
-            scores = zeros( l_theta, 1 );
-            for i = 1 : l_theta
-                scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
-            end
-            [~,dV] = min(scores);
-            dH = rem( dV+step, step*2 );
-            dH = dH + (dH == 0)*step*2;
-            directV(x,y) = dV;
-            directH(x,y) = dH;
+            [directV(x,y), directH(x,y)] = ...
+                adjustDir( labels_nei, maxLabel, masks_band, l_theta );
         end
         labelImg(x,y) = maxLabel;
         labelHits(maxLabel) = labelHits(maxLabel) + 1;
@@ -447,9 +446,10 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
                         i_y = k * (i_x - x ) + y;
                         i_y = floor( i_y + 0.5 );
                         if labelImg(i_x, i_y) <= 0
-                            if labelImg(i_x, i_y) < -1
-                                directV(i_x, i_y) = directV(x,y);
-                                directH(i_x, i_y) = directH(x,y);
+                            if norm(i_x-x_pre, i_y-y_pre) >= width
+                                labels_nei = labelImg( i_x-width:i_x+width, i_y-width:i_y+width );
+                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                    adjustDir( labels_nei, maxLabel, masks_band, l_theta );
                             end
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
@@ -462,9 +462,10 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
                         i_x = k * (i_y - y ) + x;
                         i_x = floor( i_x + 0.5 );
                         if( labelImg(i_x, i_y) <= 0 )
-                            if labelImg(i_x, i_y) < -1
-                                directV(i_x, i_y) = directV(x,y);
-                                directH(i_x, i_y) = directH(x,y);
+                            if norm(i_x-x_pre, i_y-y_pre) >= width
+                                labels_nei = labelImg( i_x-width:i_x+width, i_y-width:i_y+width );
+                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
+                                    adjustDir( labels_nei, maxLabel, masks_band, l_theta );
                             end
                             labelImg(i_x, i_y) = maxLabel;
                             labelHits(maxLabel) = labelHits(maxLabel) + 1;
@@ -505,6 +506,18 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
     for i = 1 : length(labels)
         labelImg( labelImg == labels(i) ) = i;
     end
+end
+
+function [dV, dH] = adjustDir( labels_nei, label, masks_band, l_theta)
+    assert( rem(l_theta, 2) == 0 );
+    preP = labels_nei == label;
+    scores = zeros( l_theta, 1 );
+    for i = 1 : l_theta
+        scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
+    end
+    [~,dV] = max(scores);
+    dH = rem( dV + l_theta/2, l_theta );
+    dH = dH + (dH == 0)*l_theta;
 end
 
 function filters = getLDE( sz,d, orientations )
