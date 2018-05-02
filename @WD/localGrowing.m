@@ -3,6 +3,11 @@ function labelImg = localGrowing( grayImg, enImg )
     sz = 6;
     minlen = 20;
     [labelImg, lines, directH, directV] = vesselGrowing( grayImg, enImg, step, sz, minlen );
+    %%%%%%
+%     tempI = labelImg;
+%     tempI( tempI < 0 )  = 0;
+%     figure, imshow( label2rgb(tempI, @jet, [.5,.5,.5]) );
+    %%%%%%
     
     [m,n] = size(labelImg);
     inc = 90 / step;
@@ -19,17 +24,27 @@ function labelImg = localGrowing( grayImg, enImg )
     pre_ep = zeros( 2, 2 );
 %     whilecount = 0; %%%%%%%%%%%%%%
     while ~isequal( preI, labelImg )
-        preI = labelImg;
-        l_labels = length( lines );
-        %%%%%%%%%%%
+        %%%%%%%%%
 %         whilecount = whilecount + 1;
 %         if rem( whilecount, 1 ) == 0
+%             WI = preI;
+%             WI( WI < 0 ) = 0;
+%             CI = label2rgb( WI, @jet, [.5, .5, .5 ] );
+%             figure,imshow( CI );
+%             
 %             WI = labelImg;
 %             WI( WI < 0 ) = 0;
 %             CI = label2rgb( WI, @jet, [.5, .5, .5 ] );
 %             figure,imshow( CI );
+%             
+%             WI = labelImg - preI;
+%             WI(WI ~= 0) = 1;
+%             CI = label2rgb( WI, @jet, [.5, .5, .5 ] );
+%             figure,imshow( CI );
 %         end
-        %%%%%%%%%%%5
+        %%%%%%%%%
+        preI = labelImg;
+        l_labels = length( lines );
         for label = 1 : l_labels
             add_seg = cell( m+n, 2 );
             count_seg = [0 0];
@@ -58,7 +73,7 @@ function labelImg = localGrowing( grayImg, enImg )
 %                         WI = labelImg;
 %                         WI( WI < 0 ) = 0;
 %                         CI = label2rgb( WI, @jet, [.5, .5, .5 ] );
-%                         imshow( CI );
+%                         figure, imshow( CI );
 %                     end
                     %%%%%%%%%
                     dV = directV( x, y );
@@ -111,87 +126,93 @@ function labelImg = localGrowing( grayImg, enImg )
                                 theta = acos( dot(-A,B)/norm(A)/norm(B) );
                                 
                                 angles = [ alpha, beta, theta ];
-                                [~,min_ang] = min( angles );
-                                if  min_ang == 1
+                                [minAng,idx_minAng] = min( angles );
+                                if  idx_minAng == 3  ||  minAng > smooth * pi
+                                    mask( x_end, y_end ) = 0;
+                                else
+                                    dx = x_next - x;
+                                    dy = y_next - y;
+                                    if abs(dx) > abs(dy)
+                                        k = dy / dx;
+                                        for i_x = x+1 : x_next-1
+                                            i_y = k * (i_x - x ) + y;
+                                            i_y = floor( i_y + 0.5 );
+                                            if labelImg(i_x, i_y) <= 0
+                                                labelImg(i_x, i_y) = label;
+                                                count_seg(ii) = count_seg(ii) + 1;
+                                                add_seg{ count_seg(ii), ii } = [i_x, i_y];
+                                            end
+                                        end
+                                    else
+                                        k = dx / dy;
+                                        for i_y = y+1 : y_next-1
+                                            i_x = k * (i_y - y ) + x;
+                                            i_x = floor( i_x + 0.5 );
+                                            if( labelImg(i_x, i_y) <= 0 )
+                                                labelImg(i_x, i_y) = label;
+                                                count_seg(ii) = count_seg(ii) + 1;
+                                                add_seg{ count_seg(ii), ii } = [i_x, i_y];
+                                            end
+                                        end
+                                    end
+                                    
+                                    if idx_minAng == 1
+                                        idx_ep = 1;
+                                        delta = -1;
+                                    else
+                                        idx_ep = lln;
+                                        delta = 1;
+                                    end
                                     count = count_seg(ii);
-                                    count_seg(ii) = count + idx;
-                                    add_seg( count+1:count_seg(ii), ii) = line_n(idx:-1:1);
-                                    for jjj = 1 : idx
+                                    count_seg(ii) = count + (idx_ep-idx)/delta + 1;
+                                    add_seg( count+1:count_seg(ii), ii) = ...
+                                        line_n(idx:delta:idx_ep);
+                                    for jjj = idx : delta: idx_ep
                                         labelImg( line_n{jjj}(1), line_n{jjj}(2) ) = label;
                                     end
-                                    lines{label_n} = line_n( idx+1:lln );
                                     
-                                    x = line_n{1}(1);
-                                    y = line_n{1}(2);
-                                    x_pre = line_n{sz}(1);
-                                    y_pre = line_n{sz}(2);
+                                    lines{label_n} = line_n( idx-delta:-delta:lln-idx_ep+1 );
+
+                                    x = line_n{idx_ep}(1);
+                                    y = line_n{idx_ep}(2);
+                                    x_pre = line_n{ idx_ep - delta * (sz-1) }(1);
+                                    y_pre = line_n{ idx_ep - delta * (sz-1) }(2);
                                     break;
-                                else
-                                    if  min_ang == 2
-                                        count = count_seg(ii);
-                                        count_seg(ii) = count + lln - idx + 1;
-                                        add_seg( count+1:count_seg(ii), ii) = line_n(idx:lln);
-                                        for jjj = idx : lln
-                                            labelImg( line_n{jjj}(1), line_n{jjj}(2) ) = label;
-                                        end
-                                        lines{label_n} = line_n( 1:idx-1 );
-                                        
-                                        x = line_n{lln}(1);
-                                        y = line_n{lln}(2);
-                                        x_pre = line_n{lln-sz+1}(1);
-                                        y_pre = line_n{lln-sz+1}(2);
-                                        break;
-                                    else
-                                        mask( x_end, y_end ) = 0;
-                                    end
                                 end
                             else
                                 if idx <= sz
                                     next_n = line_n{idx + sz};
                                     B = [ next_n(1) - x_next, next_n(2) - y_next ];
                                     C = [ x_next - x, y_next - y ];
-                                    beta = acos( dot(B,C)/norm(B)/norm(C) );
-                                    
-                                    if beta < pi * smooth
-                                        count = count_seg(ii);
-                                        count_seg(ii) = count + lln - idx + 1;
-                                        add_seg( count+1:count_seg(ii), ii) = line_n(idx:lln);
-                                        for jjj = idx : lln
-                                            labelImg( line_n{jjj}(1), line_n{jjj}(2) ) = label;
-                                        end
-                                        lines{label_n} = line_n( 1:idx-1 );
-                                        
-                                        x = line_n{lln}(1);
-                                        y = line_n{lln}(2);
-                                        x_pre = line_n{lln-sz+1}(1);
-                                        y_pre = line_n{lln-sz+1}(2);
-                                        break;
-                                    else
-                                        mask( x_end, y_end ) = 0;
-                                    end
+                                    gama = acos( dot(B,C)/norm(B)/norm(C) );
+                                    idx_ep = lln;
+                                    delta = 1;
                                 else
                                     pre_n = line_n{idx - sz};
                                     A = [ pre_n(1) - x_next, pre_n(2) - y_next ];
                                     C = [ x_next - x, y_next - y ];
-                                    alpha = acos( dot(A,C)/norm(A)/norm(C) );
-                                    
-                                    if alpha < pi * smooth
-                                        count = count_seg(ii);
-                                        count_seg(ii) = count + idx;
-                                        add_seg( count+1:count_seg(ii), ii) = line_n(idx:-1:1);
-                                        for jjj = 1 : idx
-                                            labelImg( line_n{jjj}(1), line_n{jjj}(2) ) = label;
-                                        end
-                                        lines{label_n} = line_n( idx+1:lln );
-
-                                        x = line_n{1}(1);
-                                        y = line_n{1}(2);
-                                        x_pre = line_n{sz}(1);
-                                        y_pre = line_n{sz}(2);
-                                        break;
-                                    else
-                                        mask( x_end, y_end ) = 0;
+                                    gama = acos( dot(A,C)/norm(A)/norm(C) );
+                                    idx_ep = 1;
+                                    delta = -1;
+                                end
+                                if gama < pi * smooth
+                                    count = count_seg(ii);
+                                    count_seg(ii) = count + (idx_ep-idx)/delta + 1;
+                                    add_seg( count+1:count_seg(ii), ii) = ...
+                                        line_n(idx:delta:idx_ep);
+                                    for jjj = idx:delta:idx_ep
+                                        labelImg( line_n{jjj}(1), line_n{jjj}(2) ) = label;
                                     end
+                                    
+                                    lines{label_n} = line_n( idx-delta:-delta:lln-idx_ep+1 );
+
+                                    x = line_n{idx_ep}(1);
+                                    y = line_n{idx_ep}(2);
+                                    x_pre = line_n{ idx_ep - delta * (sz-1) }(1);
+                                    y_pre = line_n{ idx_ep - delta * (sz-1) }(2);
+                                    break;
+                                else
+                                    mask( x_end, y_end ) = 0;
                                 end
                             end
                         else
@@ -280,16 +301,25 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
         evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
     end
 
-    [maxEvi, directV] = max(evidences, [], 3);
+    [~, directV] = max(evidences, [], 3);
     directH = rem( directV+step, step*2 );
     directH(directH == 0) = step*2;
     
     variances = var(evidences, 1, 3);
     variances = variances * l_theta;
-    weightImg = oriImg .* maxEvi;
+    
+    eI = edge( oriImg, 'sobel' );
+    str = strel( 'disk', 2 );
+    bw = imclose( eI, str );
+%     figure, imshow(bw);
+    allwires = (bw .* I) > 0;
+%     figure, imshow( allwires );
+    
+    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );
+    
     labelImg = zeros(m,n);
-    labelImg( variances > varTresh ) = -1;
-    labelImg( variances <= varTresh & weightImg > 0.1 ) = -2;
+    labelImg( variances > varTresh  &  skI == 1 ) = -1;
+    labelImg( variances <= varTresh & skI == 1 ) = -2;
     
 %     figure, imshow( imresize( label2rgb( labelImg * -1, @jet, [.5,.5,.5] ), 0.5 ) );
 
