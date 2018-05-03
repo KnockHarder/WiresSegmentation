@@ -1,35 +1,55 @@
 function labelImg = localGrowing( grayImg, enImg )
     step = 6;
-    sz = 6;
-    minlen = 20;
-    [labelImg, lines, directH, directV] = vesselGrowing( grayImg, enImg, step, sz, minlen );
-    %%%%%%
-    labels = length(lines);
-    for i = 1 : labels
-        assert( length(lines{i}) == sum(sum(labelImg == i)) );
-    end
-%     labelImg(labelImg < 0 ) = 0;
-%     return;
-    %%%%%%
-    
-    [m,n] = size(labelImg);
     inc = 90 / step;
     all_theta = inc:inc:180;
-    l_theta = length(all_theta);
-    smooth = 0.25;
+    sz = 6;
+    
+    I = enImg;
+    [m, n] = size( I );
+    l_theta = length( all_theta );
+    assert( l_theta == 2 * step );
+    assert( m > sz * 3  &&  n > sz * 3 );
     filters = getLDE( sz, 0.6, all_theta );
+    evidences = zeros( m, n, l_theta ); 
+    varTresh = 0.2;
+    for i = 1 : l_theta
+        evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
+    end
+    [~, directV] = max(evidences, [], 3);
+    
+    variances = var(evidences, 1, 3);
+    variances = variances * l_theta;   
+    eI = edge( grayImg, 'sobel' );
+    str = strel( 'disk', 2 );
+    bw = imclose( eI, str );
+%     figure, imshow(bw);
+    allwires = (bw .* I) > 0;
+%     figure, imshow( allwires );    
+    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );    
+    labelImg = zeros(m,n);
+    labelImg( variances > varTresh  &  skI == 1 ) = -1;
+    labelImg( variances <= varTresh & skI == 1 ) = -2;
+    
+    inc = 90 / step;
+    all_theta = inc:inc:180;
     masks_band = filters > 0;
+    minlen = 2*sz + 1;
+    smooth = 0.25;
     [X,Y] = meshgrid(-sz:sz);
     sigma = 2;
     G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
     
+    lines = [];
     preI = labelImg * 0;
     ep = zeros( 2, 2 );
     pre_ep = zeros( 2, 2 );
-%     whilecount = 0; %%%%%%%%%%%%%%
+    whilecount = 0; %%%%%%%%%%%%%%
     while ~isequal( preI, labelImg )
         %%%%%%%%%
-%         whilecount = whilecount + 1;
+        if whilecount == 1
+            break;
+        end
+        whilecount = whilecount + 1,
 %         if rem( whilecount, 1 ) == 0
 %             WI = preI;
 %             WI( WI < 0 ) = 0;
@@ -48,8 +68,16 @@ function labelImg = localGrowing( grayImg, enImg )
 %         end
         %%%%%%%%%
         preI = labelImg;
+        [labelImg, lines, directV] = vesselGrowing( labelImg, lines, masks_band,...
+            directV, sz, minlen);
+        directH = rem( directV + l_theta/2, l_theta );
+        directH( directH == 0 ) = l_theta;
+        %%%%%
+%         labelImg( labelImg < 0 ) = 0;
+%         return;
+        %%%%%
         l_labels = length( lines );
-        for label = 1 : l_labels
+        for label = 1 :1 :l_labels
             add_seg = cell( m+n, 2 );
             count_seg = [0 0];
             theLine = lines{label};
@@ -124,9 +152,9 @@ function labelImg = localGrowing( grayImg, enImg )
 
                                 A = [ pre_n(1) - x_next, pre_n(2) - y_next ];
                                 B = [ next_n(1) - x_next, next_n(2) - y_next ];
-                                C = [ x_next - x, y_next - y ];
-                                alpha = acos( dot(A,C)/norm(A)/norm(C) );
-                                beta = acos( dot(B,C)/norm(B)/norm(C) );
+                                C = [ x - x_next, y - y_next ];
+                                alpha = acos( dot(-A,C)/norm(A)/norm(C) );
+                                beta = acos( dot(-B,C)/norm(B)/norm(C) );
                                 theta = acos( dot(-A,B)/norm(A)/norm(B) );
                                 
                                 angles = [ alpha, beta, theta ];
@@ -199,15 +227,15 @@ function labelImg = localGrowing( grayImg, enImg )
                                 if idx <= sz
                                     next_n = line_n{idx + sz};
                                     B = [ next_n(1) - x_next, next_n(2) - y_next ];
-                                    C = [ x_next - x, y_next - y ];
-                                    gama = acos( dot(B,C)/norm(B)/norm(C) );
+                                    C = [ x - x_next, y - y_next ];
+                                    gama = acos( dot(-B,C)/norm(B)/norm(C) );
                                     idx_ep = lln;
                                     delta = 1;
                                 else
                                     pre_n = line_n{idx - sz};
                                     A = [ pre_n(1) - x_next, pre_n(2) - y_next ];
-                                    C = [ x_next - x, y_next - y ];
-                                    gama = acos( dot(A,C)/norm(A)/norm(C) );
+                                    C = [ x - x_next, y - y_next ];
+                                    gama = acos( dot(-A,C)/norm(A)/norm(C) );
                                     idx_ep = 1;
                                     delta = -1;
                                 end
@@ -233,8 +261,8 @@ function labelImg = localGrowing( grayImg, enImg )
                             end
                         else
                             A = [x,y] - [x_pre,y_pre];
-                            B = [x_next,y_next] - [x,y];
-                            theta = acos( dot(A,B)/norm(A)/norm(B) );
+                            B = [x,y] - [x_next,y_next];
+                            theta = acos( dot(-A,B)/norm(A)/norm(B) );
 
                             if theta < smooth * pi
                                 dx = x_next - x;
@@ -282,17 +310,8 @@ function labelImg = localGrowing( grayImg, enImg )
                                 
                                 if labelImg(x, y) < -1
                                     labels_nei = labelImg( x-sz:x+sz, y-sz:y+sz );
-                                    preP = labels_nei == label;
-                                    l_theta = length(all_theta);
-                                    scores = zeros( l_theta, 1 );
-                                    for i = 1 : l_theta
-                                        scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
-                                    end
-                                    [~,dV] = min(scores);
-                                    dH = rem( dV+step, step*2 );
-                                    dH = dH + (dH == 0)*step*2;
-                                    directV(x,y) = dV;
-                                    directH(x,y) = dH;
+                                    [directV(x,y), directH(x,y)] = adjustDir( labels_nei, ...
+                                        label, masks_band, l_theta );
                                 end
                                 labelImg(x,y) = label;
                                 count_seg(ii) = count_seg(ii) + 1;
@@ -322,69 +341,37 @@ function labelImg = localGrowing( grayImg, enImg )
     end
 end
 
-function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, step, sz, minlen )
+function [labelImg, lines, directV] = vesselGrowing( labelImg, lines, masks_band, ...
+    directV, width, minlen)
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
-    assert( rem(90,step) == 0 );
-    inc = 90 / step;
-    all_theta = inc:inc:180;
-    
-    I = enImg;
-    [m, n] = size( I );
-    l_theta = length( all_theta );
-    assert( m > sz * 3  &&  n > sz * 3 );
-    filters = getLDE( sz, 0.6, all_theta );
-    evidences = zeros( m, n, l_theta ); 
-    varTresh = 0.2;
-    for i = 1 : l_theta
-        evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
-    end
-
-    [~, directV] = max(evidences, [], 3);
-    directH = rem( directV+step, step*2 );
-    directH(directH == 0) = step*2;
-    
-    variances = var(evidences, 1, 3);
-    variances = variances * l_theta;
-    
-    eI = edge( oriImg, 'sobel' );
-    str = strel( 'disk', 2 );
-    bw = imclose( eI, str );
-%     figure, imshow(bw);
-    allwires = (bw .* I) > 0;
-%     figure, imshow( allwires );
-    
-    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );
-    
-    labelImg = zeros(m,n);
-    labelImg( variances > varTresh  &  skI == 1 ) = -1;
-    labelImg( variances <= varTresh & skI == 1 ) = -2;
-    
-%     figure, imshow( imresize( label2rgb( labelImg * -1, @jet, [.5,.5,.5] ), 0.5 ) );
-
     hitsThresh = minlen;
+    [~,~,l_theta] = size( masks_band );
+    directH = rem( directV + l_theta/2, l_theta );
+    directH( directH == 0 ) = l_theta;
     smooth = 0.25;
     sigma = 1;
-    width = sz;
-    filters_band = filters( sz+1-width:sz+1+width, sz+1-width:sz+1+width, : );
-    masks_band = filters_band > 0;
     [X,Y] = meshgrid(-width:width);
     G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
     G = G / G( width+1, width+1 );
-
+    
+    [m,n] = size( labelImg );
     labelImg( 1:width, : ) = 0;
     labelImg( :, 1:width ) = 0;
     labelImg( m-width+1:m, : ) = 0;
     labelImg( :, n-width+1:n ) = 0;
     labelHits = zeros(m*n, 1);
+    ori_lines = lines;
+    l_lines = length( lines );
+    maxLabel = l_lines + 1;
     lines = cell( m*n, 1 );
+    lines(1:1:l_lines) = ori_lines(:);
 %     maxp = sum( sum( labelImg < 0 ) );
 % 
 %     [x,y] = getNextPoint( labelImg, 1, 1, -1 );
 %     count = 0;
     [x,y] = find( labelImg == -1, 1 );
     x_pre = -1; y_pre = -1;
-    maxLabel = 1;
     labelImg(x,y) = maxLabel;
     labelHits(maxLabel) = 0;
     lines{maxLabel} = cell( m+n, 1 );
@@ -501,7 +488,7 @@ function [labelImg, lines, directH, directV] = vesselGrowing( oriImg, enImg, ste
     lines = lines( labelHits >= hitsThresh );
     
     for lb = badLabels'
-        labelImg( labelImg == lb ) = -2;
+        labelImg( labelImg == lb ) = -1;
     end
     for i = 1 : length(labels)
         labelImg( labelImg == labels(i) ) = i;
