@@ -37,11 +37,6 @@ function labelImg = localGrowing( grayImg, enImg )
         l_eachLine(i) = 1;
     end
     l_lines = length(inds);
-    %%%%%%%%%%%%%
-    for i = 1: 1: l_lines
-        assert( l_eachLine(i) == sum(sum(labelImg == i )) );
-    end
-    %%%%%%%%%%%%%%
     
     [~, directV] = max(evidences, [], 3);
     directH = rem( directV + step, l_theta );
@@ -72,7 +67,6 @@ function labelImg = localGrowing( grayImg, enImg )
             for ii = -1 : 2 :1
                 theLine = lines{label};
                 l_theline = l_eachLine(label);
-                assert( l_theline == sum(sum(labelImg == label)) );
                 
                 if ii == -1
                     idx = 1;
@@ -122,21 +116,13 @@ function labelImg = localGrowing( grayImg, enImg )
                             label_f = labelImg(x_find, y_find); 
                             line_f = lines{label_f};
                             idx_f = find( cellfun( @(x) isequal(x, [x_find, y_find]), line_f ), 1 );
-                            assert( ~isempty(idx_f) ); % for debuging
                             
                             len_f = l_eachLine(label_f);
-                            %%%%%%%%%%%%%%%%%
-                            assert( idx_f >= 1 && idx_f <= len_f ); 
-                            assert( len_f == sum(sum(labelImg == label_f)) );
-                            %%%%%%%%%%%%%%%%%
                             if len_f < 2
                                 labelImg(x_find, y_find) = label;
                                 count_seg = count_seg + 1;
                                 add_seg{count_seg} = [x_find, y_find];
                                 l_eachLine(label_f) = 0;
-                                %%%%%%%%%%%%%
-                                assert( l_eachLine(label_f) == sum(sum(labelImg == label_f)) );
-                                %%%%%%%%%%%%%%
                                 break;
                             end
                             
@@ -252,9 +238,6 @@ function labelImg = localGrowing( grayImg, enImg )
 
                                 lines{label_f}(1:1:len_f-idx_f) = line_f( idx_f+1:1:len_f );
                                 l_eachLine(label_f) = len_f - idx_f;
-                                %%%%%%%%%%%%%
-                                assert( l_eachLine(label_f) == sum(sum(labelImg == label_f)) );
-                                %%%%%%%%%%%%%%
                             else
                                 count = count_seg;
                                 count_seg = count + len_f - idx_f + 1;
@@ -266,9 +249,6 @@ function labelImg = localGrowing( grayImg, enImg )
                                 y = line_f{len_f}(2);
 
                                 l_eachLine(label_f) = idx_f - 1;
-                                %%%%%%%%%%%%%
-                                assert( l_eachLine(label_f) == sum(sum(labelImg == label_f)) );
-                                %%%%%%%%%%%%%%
                             end
                             break;
                         else
@@ -351,14 +331,10 @@ function labelImg = localGrowing( grayImg, enImg )
                     lines{label}(count_seg+1:1:count_seg+l_theline) = ...
                         theLine(1:1:l_theline);
                     l_eachLine(label) = count_seg + l_theline;
-                    %%%%%%%%%%%%%
-                    assert( l_eachLine(label) == sum(sum(labelImg == label)) );
-                    %%%%%%%%%%%%%%
                 else
                     lines{label}(l_theline+1:1:l_theline+count_seg) = ...
                         add_seg( 1:1:count_seg );
                     l_eachLine(label) = count_seg + l_theline;
-                    assert( l_eachLine(label) == sum(sum(labelImg == label)) );
                 end
             end
         end
@@ -377,11 +353,6 @@ function labelImg = localGrowing( grayImg, enImg )
             lines{i}(1:1:l_theline) = lines{label}(1:1:l_theline);
             l_eachLine(i) = l_eachLine(label);
         end
-        %%%%%%%%%%%%%
-        for i = 1: 1: l_lines
-            assert( l_eachLine(i) == sum(sum(labelImg == i )) );
-        end
-        %%%%%%%%%%%%%%
     end
     
     labelImg = labelImg * 0;
