@@ -12,10 +12,9 @@ function labelImg = localGrowing( grayImg, enImg )
     filters = getLDE( sz, 0.6, all_theta );
     evidences = zeros( m, n, l_theta ); 
     varTresh = 0.2;
-    for i = 1 : l_theta
-        evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
+    for idx_theta = 1 : l_theta
+        evidences( :, :, idx_theta ) = imfilter( I, filters(:,:,idx_theta), 'same', 'replicate' );
     end
-    
     variances = var(evidences, 1, 3);
     variances = variances * l_theta;   
     eI = edge( grayImg, 'sobel' );
@@ -23,364 +22,396 @@ function labelImg = localGrowing( grayImg, enImg )
     bw = imclose( eI, str );
     allwires = (bw .* I) > 0;
 
-    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );    
-    labelImg = zeros(m,n);
-    labelImg( variances <= varTresh & skI == 1 ) = -2;
+    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );  
     inds = find( variances > varTresh  &  skI == 1 );
-    lines = cell( m*n, 1 );
-    l_eachLine = zeros(m*n, 1);
-    for i = 1 : length(inds)
-        idx = inds(i);
-        [x,y] = ind2sub( [m,n], idx );
-        labelImg(x,y) = i;
-        lines{i} = {[x,y]};
-        l_eachLine(i) = 1;
-    end
-    l_lines = length(inds);
-    
-    [~, directV] = max(evidences, [], 3);
-    directH = rem( directV + step, l_theta );
-    directH( directH == 0 ) = l_theta;
-    masks_band = filters > 0;
-    minlen = sz + 1;
-    smooth = 0.25;
     [X,Y] = meshgrid(-sz:sz);
-    sigma = 2;
-    G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
-    
-    add_seg = cell( m+n, 1 );
-    preI = labelImg * 0;
-    whilecount = 0; %%%%%%%%%%%%%%
-    assert( minlen > sz );
-    while ~isequal( preI, labelImg )
-        %%%%%%%%%
-        if whilecount == 10
-            break;
+    mask_disk = (X.^2 + Y.^2) <= sz^2;
+    dots = cell( length(inds), 1 );
+    l_dots = 0;
+    sub2idx_dot = zeros(m,n);
+    for idx_ind = 1 : length(inds)
+        theInd = inds(idx_ind);
+        [x,y] = ind2sub( [m,n], theInd );
+        if  sum(sum( sub2idx_dot( x-sz:x+sz, y-sz:y+sz ) .* mask_disk )) == 0
+            l_dots = l_dots + 1;
+            dots{l_dots} = [x,y];
+            sub2idx_dot(x,y) = l_dots;
         end
-        whilecount = whilecount + 1,
-        %%%%%%%%%
-        preI = labelImg;
-        for label = 1 :1 :l_lines
-            if l_eachLine(label) == 0
+    end
+    
+    ind_ap = find( allwires | imfilter(sub2idx_dot,ones(3,3)) );
+    l_ap = length( ind_ap );
+    sub2idx_ap = zeros(m,n);
+    for idx_ap = 1: 1: l_ap
+        [x,y] = ind2sub( [m,n], ind_ap(idx_ap) );
+        sub2idx_ap(x,y) = idx_ap;
+    end
+    %%%%%%%%%%%
+%     bw_dots = sub2idx_dot > 0;
+%     figure, imshow( bw_dots );
+%     bw_ap = sub2idx_ap > 0;
+%     figure, imshow( bw_ap );
+%     bw_dots = imfilter( bw_dots, ones(3,3) ) > 0;
+%     figure, imshow( bw_dots );
+%     figure, imshow( bw_dots & (1-bw_ap) );
+    %%%%%%%%%%%
+    I = grayImg;
+    for idx_theta = 1 : l_theta
+        evidences( :, :, idx_theta ) = imfilter( I, filters(:,:,idx_theta), 'same', 'replicate' );
+    end
+    [maxEvi,~] = max( evidences, [], 3 );
+    maxEvi = maxEvi / max(max(maxEvi)) * m;
+    [DX,DY,DE] = get8diff( maxEvi );
+    
+    
+    I_nei9 = ones(3,3);
+    dis_d2p = zeros( l_dots, l_ap );
+    par_d2p = zeros( l_dots, l_ap );
+%     l_dots,
+    for idx_dot = 1: 1: l_dots
+        %%%%
+        if  rem( idx_dot, 200 ) == 0
+            display(idx_dot);
+        end
+        %%%%
+        x_dot = dots{idx_dot}(1);
+        y_dot = dots{idx_dot}(2);
+        idx_sourceP = sub2idx_ap( x_dot, y_dot );
+        distence = inf - zeros(1, l_ap);
+        distence(idx_sourceP) = 0;
+        parents = zeros(1, l_ap );
+        visited = zeros( 1, l_ap );
+        
+        for i = 1 : 8
+            x_i = x_dot + DX(i);
+            y_i = y_dot + DY(i);
+            idx_i = sub2idx_ap( x_i, y_i );
+            if  idx_i < 1
                 continue;
             end
-            for ii = -1 : 2 :1
-                theLine = lines{label};
-                l_theline = l_eachLine(label);
-                
-                if ii == -1
-                    idx = 1;
-                    x = theLine{idx}(1);
-                    y = theLine{idx}(2);
-                else
-                    idx = l_theline;
-                    x = theLine{idx}(1);
-                    y = theLine{idx}(2);
+            distence(idx_i) = DE(x_dot, y_dot, i);
+            parents(idx_i) = idx_sourceP;
+        end
+        visited(idx_sourceP) = 1;
+        temp = distence;
+        temp(idx_sourceP) = inf;
+        [~,idx_u] = min( temp );
+        ind_u = ind_ap(idx_u);
+        [x_u,y_u] = ind2sub( [m,n], ind_u );
+        for i = 1: l_ap - 1
+            for j = 1 : 8
+                x_i = x_u + DX(j);
+                y_i = y_u + DY(j);
+                idx_i = sub2idx_ap( x_i, y_i );
+                if  idx_i < 1
+                    continue;
                 end
-                if l_theline < minlen
-                    x_pre = -1;
-                    y_pre = -1;
-                else
-                    idx = idx - ii * (sz -1);
-                    x_pre = theLine{idx}(1);
-                    y_pre = theLine{idx}(2);
+                if  visited(idx_i) < 1
+                    dis_new = distence(idx_u) + DE(x_u,y_u,j);
+                    if  dis_new < distence(idx_i)
+                        distence(idx_i) = dis_new;
+                        parents(idx_i) = idx_u;
+                    end
+                end
+            end
+            
+            visited( idx_u ) = 1;
+            while 1
+                temp = distence;
+                temp( visited == 1 ) = inf;
+                [min_dis,idx_u] = min( temp );
+                if min_dis == inf
+                    break;
                 end
                 
-                count_seg = 0;
-                while 1
-                    dV = directV( x, y );
-                    dH = directH( x, y );
-                    labels_nei = labelImg( x-sz:x+sz, y-sz:y+sz);
-                    dV_nei = directV( x-sz:x+sz, y-sz:y+sz);
-                    dH_nei = directH( x-sz:x+sz, y-sz:y+sz);
-                    
-                    mask = labels_nei ~= 0  &  labels_nei ~= label;
-                    mask = mask .* masks_band(:,:,dV);
-                    diffV = dV_nei + 0.5 - dV;
-                    diffV = abs( floor(diffV + sign(diffV)) );
-                    diffH = dH_nei + 0.5 - dH;
-                    diffH = abs( floor(diffH + sign(diffH)) );
-                    diff = min( diffV, diffH );
-                    errG = (1-G) .* (diff.^2);
-                    
-                    while ~isempty( find(mask > 0, 1) )
-                        errors = mask .* errG;
-                        errors( errors == 0 ) = inf;
-                        [minCol, X] = min( errors );
-                        [~,y_end] = min( minCol );
-                        x_end = X(y_end);
-                        x_find = x + ( x_end - sz - 1);
-                        y_find = y + ( y_end - sz - 1 );
-
-                        if labelImg(x_find, y_find) > 0
-                            label_f = labelImg(x_find, y_find); 
-                            line_f = lines{label_f};
-                            idx_f = find( cellfun( @(x) isequal(x, [x_find, y_find]), line_f ), 1 );
-                            
-                            len_f = l_eachLine(label_f);
-                            if len_f < 2
-                                labelImg(x_find, y_find) = label;
-                                count_seg = count_seg + 1;
-                                add_seg{count_seg} = [x_find, y_find];
-                                l_eachLine(label_f) = 0;
-                                break;
-                            end
-                            
-                            A = [x,y] - [x_pre, y_pre];
-                            B = [x,y] - [x_find,y_find];
-                            if x_pre == -1
-                                alpha = 0;
-                            else
-                                alpha = acos( dot(-A,B)/norm(A)/norm(B) );
-                            end
-                            if alpha > pi * smooth
-                                mask(x_end,y_end) = 0;
-                                continue;
-                            end
-                            
-                            idx_pre = max( 1, idx_f - sz );
-                            pre_f = line_f{idx_pre};
-                            idx_next = min( len_f, idx_f + sz );
-                            next_f = line_f{idx_next};
-                            A = pre_f - [x_find, y_find];
-                            B = next_f - [x_find, y_find];
-                            C = [ x - x_find, y - y_find ];
-                            if idx_f == 1 || idx_f == len_f
-                                if idx_f == 1
-                                    alpha = inf;
-                                    beta = 0;
-                                    theta = inf;
-                                else
-                                    alpha = 0;
-                                    beta = inf;
-                                    theta = inf;
-                                end
-                            else                                
-                                theta_n = all_theta( directV(x_find,y_find) );
-                                if idx_pre == 1
-                                    A1 = [ -cos(theta_n), sin(theta_n) ];
-                                    A2 = -A1;
-                                    if dot(A1, -A) >= 0
-                                        A = A1;
-                                    else
-                                        A = A2;
-                                    end 
-                                end
-                                if idx_next == len_f
-                                    B1 = [ -cos(theta_n), sin(theta_n) ];
-                                    B2 = -B1;
-                                    if dot(B1,B) >= 0
-                                        B = B1;
-                                    else
-                                        B = B2;
-                                    end
-                                end
-                                
-                                alpha = acos( dot(-A,C)/norm(A)/norm(C) );
-                                beta = acos( dot(-B,C)/norm(B)/norm(C) );
-                                theta = acos( dot(-A,B)/norm(A)/norm(B) );
-                            end
-                                
-                            angles = [ alpha, beta, theta ];
-                            [~,idx_min] = min( angles );
-                            if  idx_min == 3
-                                mask( x_end, y_end ) = 0;
-                                continue;
-                            end
-                            
-                            dx = x_find - x;
-                            dy = y_find - y;
-                            delta_x = sign(dx);
-                            delta_y = sign(dy);
-                            if abs(dx) > abs(dy)
-                                k = dy / dx;
-                                for i_x = x+delta_x :delta_x :x_find-delta_x
-                                    i_y = k * (i_x - x ) + y;
-                                    i_y = floor( i_y + 0.5 );
-                                    if labelImg(i_x, i_y) <= 0
-                                        if labelImg(i_x, i_y) < -1
-                                            lbn_n = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
-                                            [directV(i_x, i_y), directH(i_x, i_y)] = adjustDir(...
-                                                lbn_n, label, masks_band, l_theta );
-                                        end
-                                        labelImg(i_x, i_y) = label;
-                                        count_seg = count_seg + 1;
-                                        add_seg{count_seg} = [i_x, i_y];
-                                    end
-                                end
-                            else
-                                k = dx / dy;
-                                for i_y = y+delta_y :delta_y :y_find-delta_y
-                                    i_x = k * (i_y - y ) + x;
-                                    i_x = floor( i_x + 0.5 );
-                                    if labelImg(i_x, i_y) <= 0 
-                                        if labelImg(i_x, i_y) < -1
-                                            lbn_n = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
-                                            [directV(i_x, i_y), directH(i_x, i_y)] = adjustDir(...
-                                                lbn_n, label, masks_band, l_theta );
-                                        end
-                                        labelImg(i_x, i_y) = label;
-                                        count_seg = count_seg + 1;
-                                        add_seg{count_seg} = [i_x, i_y];
-                                    end
-                                end
-                            end
-
-                            if idx_min == 1
-                                count = count_seg;
-                                count_seg = count + idx_f;
-                                add_seg( count+1:1:count_seg ) = line_f(idx_f:-1:1);
-                                for jjj = 1 : 1 : idx_f
-                                    labelImg( line_f{jjj}(1), line_f{jjj}(2) ) = label;
-                                end
-                                x = line_f{1}(1);
-                                y = line_f{1}(2);
-
-                                lines{label_f}(1:1:len_f-idx_f) = line_f( idx_f+1:1:len_f );
-                                l_eachLine(label_f) = len_f - idx_f;
-                            else
-                                count = count_seg;
-                                count_seg = count + len_f - idx_f + 1;
-                                add_seg( count+1:1:count_seg ) = line_f(idx_f:1:len_f);
-                                for jjj = idx_f : 1 : len_f
-                                    labelImg( line_f{jjj}(1), line_f{jjj}(2) ) = label;
-                                end
-                                x = line_f{len_f}(1);
-                                y = line_f{len_f}(2);
-
-                                l_eachLine(label_f) = idx_f - 1;
-                            end
+                ind_u = ind_ap(idx_u);
+                [x_u, y_u] = ind2sub( [m,n], ind_u );
+                if  sub2idx_dot( x_u, y_u ) > 0
+                    diskNei = sub2idx_ap( x_u-sz:x_u+sz, y_u-sz:y_u+sz ) & mask_disk;
+                    connection = zeros( 2*sz + 1, 2*sz + 1 );
+                    connection( sz+1, sz+1 ) = 1;
+                    for i_con = 1: 1: sz
+                        temp = imfilter( connection, I_nei9 );
+                        temp = temp & diskNei;
+                        
+                        if isequal( temp, connection )
                             break;
-                        else
-                            A = [x,y] - [x_find,y_find];
-                            if x_pre == -1
-                                theta = 0;
-                            else
-                                B = [x,y] - [x_pre,y_pre];
-                                theta = acos( dot(-A,B)/norm(A)/norm(B) );
-                            end
-
-                            if theta < smooth * pi
-                                dx = x_find - x;
-                                dy = y_find - y;
-                                delta_x = sign(dx);
-                                delta_y = sign(dy);
-
-                                if abs(dx) > abs(dy)
-                                    k = dy / dx;
-                                    for i_x = x+delta_x :delta_x :x_find-delta_x
-                                        i_y = k * (i_x - x ) + y;
-                                        i_y = floor( i_y + 0.5 );
-                                        if labelImg(i_x, i_y) <= 0
-                                            if labelImg(i_x, i_y) < -1
-                                                labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
-                                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
-                                                        adjustDir( labels_nei, label, masks_band, l_theta );
-                                            end
-                                            labelImg(i_x, i_y) = label;
-                                            count_seg = count_seg + 1;
-                                            add_seg{ count_seg } = [i_x, i_y];
-                                        end
-                                    end
-                                else
-                                    k = dx / dy;
-                                    for i_y = y+delta_y :delta_y :y_find-delta_y
-                                        i_x = k * (i_y - y ) + x;
-                                        i_x = floor( i_x + 0.5 );
-                                        if( labelImg(i_x, i_y) <= 0 )
-                                            if labelImg(i_x, i_y) < -1
-                                                labels_nei = labelImg( i_x-sz:i_x+sz, i_y-sz:i_y+sz );
-                                                [directV(i_x,i_y), directH(i_x,i_y)] = ...
-                                                        adjustDir( labels_nei, label, masks_band, l_theta );
-                                            end
-                                            labelImg(i_x, i_y) = label;
-                                            count_seg = count_seg + 1;
-                                            add_seg{ count_seg } = [i_x, i_y];
-                                        end
-                                    end
-                                end
-                                x = x_find;  y = y_find;
-                                
-                                if labelImg(x, y) < -1
-                                    labels_nei = labelImg( x-sz:x+sz, y-sz:y+sz );
-                                    [directV(x,y), directH(x,y)] = adjustDir( labels_nei, ...
-                                        label, masks_band, l_theta );
-                                end
-                                labelImg(x,y) = label;
-                                count_seg = count_seg + 1;
-                                add_seg{ count_seg } = [x, y];
-                                break;
-                            else
-                                mask( x_end, y_end ) = 0;
-                            end
                         end
+                        connection = temp;
                     end
-                    
-                    if count_seg > sz
-                        point_pre = add_seg{ count_seg - sz };
-                        x_pre = point_pre(1);
-                        y_pre = point_pre(2);
-                    end               
-                    if isempty( find( mask > 0, 1 ) )
-                        break;
+                    [X_con,Y_con] = find( connection > 0 );
+                    DX_con = X_con - sz - 1;
+                    DY_con = Y_con - sz - 1;
+                    for i_con = 1: 1: length(DX_con)
+                        x_con = x_u + DX_con(i_con);
+                        y_con = y_u + DY_con(i_con);
+                        idx_con = sub2idx_ap( x_con, y_con );
+                        visited(idx_con) = 1;
                     end
-                end
-                
-                if ii == -1
-                    lines{label}(1:1:count_seg) = add_seg( count_seg:-1:1 );
-                    lines{label}(count_seg+1:1:count_seg+l_theline) = ...
-                        theLine(1:1:l_theline);
-                    l_eachLine(label) = count_seg + l_theline;
                 else
-                    lines{label}(l_theline+1:1:l_theline+count_seg) = ...
-                        add_seg( 1:1:count_seg );
-                    l_eachLine(label) = count_seg + l_theline;
+                    break;
                 end
+            end
+            if min_dis == inf
+                break;
             end
         end
-        
-        rem_labels = find( l_eachLine(1:1:l_lines) > 0 );
-        l_lines = length( rem_labels );
-        for i = 1 : 1 :l_lines
-            label = rem_labels(i);
-            theLine = lines{label};
-            l_theline = l_eachLine(label);
-            for idx = 1 : 1 : l_theline
-                x = theLine{idx}(1);
-                y = theLine{idx}(2);
-                labelImg(x,y) = i;
+        %%%%%%%%%%%%%
+%         temp = distence;
+%         temp( idx_sourceP ) = inf;
+%         t_findD = find( temp < inf );
+%         t_findP = find( parents > 0 );
+%         assert( isequal( t_findD, t_findP ) );
+        %%%%%%%%%%%%%%%%%%%%%%%%
+        dis_d2p(idx_dot, :) = distence(:);
+        par_d2p(idx_dot, :) = parents(:);
+    end
+    
+    dis_dd = inf - zeros( l_dots, l_dots );
+    for idx_headD = 1 : l_dots
+        x_start = dots{idx_headD}(1);
+        y_start = dots{idx_headD}(2);
+        idx_startP = sub2idx_ap( x_start, y_start );
+        for idx_endD = 1 : l_dots
+            x_end = dots{idx_endD}(1);
+            y_end = dots{idx_endD}(2);
+            idx_endP = sub2idx_ap( x_end, y_end );
+            if  dis_d2p( idx_headD, idx_endP ) == 0 
+                dis_dd( idx_headD,idx_endD ) = 0;
+                continue;
             end
-            lines{i}(1:1:l_theline) = lines{label}(1:1:l_theline);
-            l_eachLine(i) = l_eachLine(label);
+            if dis_d2p( idx_headD, idx_endP ) == inf
+                continue;
+            end
+                
+            max_theta = 0;
+            idx_midP = par_d2p( idx_headD, idx_endP );
+            while idx_midP ~= idx_startP
+%                 idx_midP, tempdis = dis_d2p(idx_headD, idx_endP),
+                ind_mid = ind_ap( idx_midP );
+                [x_mid, y_mid] = ind2sub( [m,n], ind_mid );
+                A = [x_start, y_start] - [x_mid, y_mid];
+                B = [x_end, y_end] - [x_mid, y_mid];
+                if norm(A) > 3 && norm(B) > 3
+                    theta = acos( dot(-A,B)/norm(A)/norm(B) );
+                    if max_theta < theta
+                        max_theta = theta;
+                    end
+                end
+                idx_midP = par_d2p( idx_headD, idx_midP );
+            end
+
+            param_k = max_theta * step / pi + 1;
+            dis_dd(idx_headD,idx_endD) = dis_d2p(idx_headD,idx_endP) * param_k;
+        end
+    end
+    old_ddd = dis_dd;
+    dis_dd = min( dis_dd, dis_dd' );
+    
+    child_dd = zeros( l_dots, 1 );
+    par_dd = zeros( l_dots, 1 );
+    child_old = child_dd + 1;
+    while   ~isequal( child_dd, child_old )
+        child_old = par_dd;
+        par_dd = child_dd;
+        child_dd = child_old;
+        
+        sourceDots = find( child_dd == 0 );        
+        for idx_headD = sourceDots'
+            dis_i = dis_dd(idx_headD,:);
+            dis_i(idx_headD) = inf;
+            
+            par_headD = par_dd(idx_headD);
+            idx_par = par_headD;
+            while   idx_par > 0
+                dis_i( idx_par ) = inf;
+                idx_par = par_dd( idx_par );
+            end
+            
+            while 1
+                [minValue_dis,idx_endD] = min( dis_i );
+                if  minValue_dis == inf
+                    break;
+                end
+                
+                par_endD = par_dd( idx_endD );
+                if  par_endD > 0
+                    if  dis_dd(idx_endD, par_endD) <= dis_dd(idx_endD, idx_headD)
+                        dis_i(idx_endD) = inf;
+                    else
+                        break;
+                    end
+                else
+                    break;
+                end
+            end
+            if  minValue_dis == inf
+                continue;
+            end
+
+            if  par_headD > 0
+                A = dots{par_headD} - dots{idx_headD};
+                B = dots{idx_endD} - dots{idx_headD};
+
+                theta = acos( dot(-A,B)/norm(A)/norm(B) );
+                if  theta < pi/2
+                    if  par_endD > 0
+                        child_dd(par_endD) = 0;
+                    end
+                    child_dd( idx_headD ) = idx_endD;
+                    par_dd( idx_endD ) = idx_headD;
+                end
+            else
+                if  par_endD > 0
+                    child_dd(par_endD) = 0;
+                end
+                child_dd( idx_headD ) = idx_endD;
+                par_dd( idx_endD ) = idx_headD;
+            end
         end
     end
     
-    labelImg = labelImg * 0;
-    minlen = 20;
-    rem_labels = find( l_eachLine(1:1:l_lines) > minlen );
-    l_lines = length( rem_labels );
-    for i = 1 : 1 :l_lines
-        label = rem_labels(i);
-        theLine = lines{label};
-        l_theline = l_eachLine(label);
-        for idx = 1 : 1 : l_theline
-            x = theLine{idx}(1);
-            y = theLine{idx}(2);
-            labelImg(x,y) = i;
+    %%%%%%%%
+    l_dots,
+    count_child = sum(sum( child_dd == 0 )),
+    count_parents = sum(sum( par_dd == 0 )),
+    %%%%%%%%
+    visited = zeros( 1, l_dots );
+    doneAsEnd = zeros( 1, l_dots );
+    label_dot = zeros( 1, l_dots );
+    idx_headD = find( visited == 0, 1 );
+    labelImg = zeros(m,n);
+    maxLabel = 0;
+%     whilecount = 0;%%%%%%%%%
+    while   ~isempty( idx_headD )
+%         whilecount = whilecount + 1,
+        par_headD = par_dd( idx_headD );
+        if  par_headD > 0  &&  label_dot( par_headD ) > 0
+            label = label_dot( par_headD );
+        else
+            maxLabel = maxLabel + 1;
+            label = maxLabel;
+        end
+        
+        
+        labelImg( dots{idx_headD}(1), dots{idx_headD}(2) ) = label;
+        label_dot( idx_headD ) = label;
+        visited( idx_headD ) = 1;
+        
+        idx_tailD = child_dd( idx_headD );
+        while   idx_tailD > 0
+%             sum(sum( visited ) ),
+            if visited( idx_tailD )
+               corLabel = label_dot( idx_tailD );
+               if corLabel ~= label
+                   labelImg( labelImg == label ) = corLabel;
+               end
+               
+               if doneAsEnd( idx_tailD )
+                   break;
+               else
+                   label = corLabel;
+               end
+            end
+            
+            if  old_ddd(idx_headD, idx_tailD) < inf
+                idx_startD = idx_headD;
+                idx_endD = idx_tailD;
+            else
+                idx_startD = idx_tailD;
+                idx_endD = idx_headD;
+            end
+            idx_startP = sub2idx_ap( dots{idx_startD}(1), dots{idx_startD}(2) );
+            x = dots{idx_endD}(1);
+            y = dots{idx_endD}(2);
+            idx = sub2idx_ap( x, y );  
+            while   idx ~= idx_startP
+                ind = ind_ap( idx );
+                [x, y] = ind2sub( [m,n], ind );
+                labelImg( x, y ) = label;
+                idx = par_d2p( idx_startD, idx );
+                assert( idx > 0 );
+            end
+            
+            visited( idx_tailD ) = 1;
+            doneAsEnd( idx_tailD ) = 1;
+            label_dot( idx_tailD ) = label;
+            idx_headD = idx_tailD;
+            idx_tailD = child_dd( idx_headD );
+        end
+        
+        idx_headD = find( visited == 0, 1 );
+    end
+    
+    label_uniq = unique( labelImg );
+    label_uniq = label_uniq( label_uniq > 0 );
+    label = 0;
+    temp = labelImg;
+    labelImg = zeros(m,n);
+    for i = 1 : length( label_uniq )
+        findImg = temp == label_uniq(i);
+        if  sum(sum( findImg )) > 20 
+            label = label + 1;
+            labelImg( findImg ) = label;
         end
     end
 end
 
-function [dV, dH] = adjustDir( labels_nei, label, masks_band, l_theta)
-    assert( rem(l_theta, 2) == 0 );
-    preP = labels_nei == label;
-    scores = zeros( l_theta, 1 );
-    for i = 1 : l_theta
-        scores(i) = sum(sum( preP .* masks_band(:,:,i) ));
-    end
-    [~,dV] = max(scores);
-    dH = rem( dV + l_theta/2, l_theta );
-    dH = dH + (dH == 0)*l_theta;
+function [DX,DY,DEvi] = get8diff( evidences )
+    [X,Y] = meshgrid(-1:1);
+    nei8 = find( X~=0 | Y~=0 );
+    DX = X(nei8);
+    DY = Y(nei8);
+    
+    [m,n] = size( evidences );
+    assert( m > 10 && n > 10 );
+    
+    temp = zeros(m,n);
+    temp(1,:) = inf;
+    temp(2:m,:) = evidences(1:m-1,:);
+    diff_t = abs(temp - evidences);
+    
+    temp(1:m-1,:) = evidences(2:m,:);
+    temp(m,:) = inf;
+    diff_b = abs( temp - evidences );
+    
+    temp(:,1) = inf;
+    temp(:,2:n) = evidences(:,1:n-1);
+    diff_l = abs( temp - evidences );
+    
+    temp(:,1:n-1) = evidences(:,2:n);
+    temp(:,n) = inf;
+    diff_r = abs( temp - evidences );
+    
+    temp(1,:) = inf;
+    temp(:,1) = inf;
+    temp( 2:m, 2:n ) = evidences( 1:m-1, 1:n-1 );
+    diff_lt = abs( temp - evidences ) * sqrt(2);
+    
+    temp(m,:) = inf;
+    temp(:,1) = inf;
+    temp(1:m-1,2:n) = evidences(2:m,1:n-1);
+    diff_lb = abs( temp - evidences ) * sqrt(2);
+    
+    temp(1,:) = inf;
+    temp(:,n) = inf;
+    temp(2:m,1:n-1) = evidences(1:m-1,2:n);
+    diff_rt = abs( temp - evidences ) * sqrt(2);
+    
+    temp(m,:) = inf;
+    temp(:,n) = inf;
+    temp(1:m-1,2:n) = evidences(2:m,1:n-1);
+    diff_rb = abs( temp - evidences ) * sqrt(2);
+    
+    DEvi = zeros(m,n,8);
+    DEvi(:,:,1) = diff_lt;
+    DEvi(:,:,2) = diff_l;
+    DEvi(:,:,3) = diff_lb;
+    DEvi(:,:,4) = diff_t;
+    DEvi(:,:,5) = diff_b;
+    DEvi(:,:,6) = diff_rt;
+    DEvi(:,:,7) = diff_r;
+    DEvi(:,:,8) = diff_rb;
 end
 
 function filters = getLDE( sz,d, orientations )
