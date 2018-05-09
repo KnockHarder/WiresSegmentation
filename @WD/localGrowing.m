@@ -3,6 +3,7 @@ function labelImg = localGrowing( grayImg, enImg )
     inc = 90 / step;
     all_theta = inc:inc:180;
     sz = 6;
+    rad_band = 4;
     
     I = enImg;
     [m, n] = size( I );
@@ -68,6 +69,8 @@ function labelImg = localGrowing( grayImg, enImg )
     dis_d2p = zeros( l_dots, l_ap );
     par_d2p = zeros( l_dots, l_ap );
 %     l_dots,
+    [X,Y] = meshgrid(-rad_band:rad_band, -rad_band:rad_band);
+    mask_disk = X.^2 + Y.^2 <= rad_band^2;
     for idx_dot = 1: 1: l_dots
         %%%%
         if  rem( idx_dot, 200 ) == 0
@@ -127,10 +130,10 @@ function labelImg = localGrowing( grayImg, enImg )
                 ind_u = ind_ap(idx_u);
                 [x_u, y_u] = ind2sub( [m,n], ind_u );
                 if  sub2idx_dot( x_u, y_u ) > 0
-                    diskNei = sub2idx_ap( x_u-sz:x_u+sz, y_u-sz:y_u+sz ) & mask_disk;
-                    connection = zeros( 2*sz + 1, 2*sz + 1 );
-                    connection( sz+1, sz+1 ) = 1;
-                    for i_con = 1: 1: sz
+                    diskNei = sub2idx_ap( x_u-rad_band:x_u+rad_band, y_u-rad_band:y_u+rad_band) & mask_disk;
+                    connection = zeros( 2*rad_band + 1, 2*rad_band + 1 );
+                    connection( rad_band+1, rad_band+1 ) = 1;
+                    for i_con = 1: 1: rad_band
                         temp = imfilter( connection, I_nei9 );
                         temp = temp & diskNei;
                         
@@ -140,8 +143,8 @@ function labelImg = localGrowing( grayImg, enImg )
                         connection = temp;
                     end
                     [X_con,Y_con] = find( connection > 0 );
-                    DX_con = X_con - sz - 1;
-                    DY_con = Y_con - sz - 1;
+                    DX_con = X_con - rad_band - 1;
+                    DY_con = Y_con - rad_band - 1;
                     for i_con = 1: 1: length(DX_con)
                         x_con = x_u + DX_con(i_con);
                         y_con = y_u + DY_con(i_con);
