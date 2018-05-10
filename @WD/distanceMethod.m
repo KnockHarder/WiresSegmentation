@@ -1,9 +1,8 @@
-function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
+function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg, spacing, bar )
     step = 6;
     inc = 90 / step;
     all_theta = inc:inc:180;
     sz = 6;
-    rad_band = 4;
     
     I = enImg;
     [m, n] = size( I );
@@ -25,15 +24,16 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
 
     skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );  
     inds = find( variances > varTresh  &  skI == 1 );
-    [X,Y] = meshgrid(-sz:sz);
-    mask_disk = (X.^2 + Y.^2) <= sz^2;
+    [X,Y] = meshgrid(-spacing:spacing);
+    mask_disk = (X.^2 + Y.^2) <= spacing^2;
     dots = cell( length(inds), 1 );
     l_dots = 0;
     sub2idx_dot = zeros(m,n);
     for idx_ind = 1 : length(inds)
         theInd = inds(idx_ind);
         [x,y] = ind2sub( [m,n], theInd );
-        if  sum(sum( sub2idx_dot( x-sz:x+sz, y-sz:y+sz ) .* mask_disk )) == 0
+        if  sum(sum( sub2idx_dot( x-spacing:x+spacing, y-spacing:y+spacing )...
+                .* mask_disk )) == 0
             l_dots = l_dots + 1;
             dots{l_dots} = [x,y];
             sub2idx_dot(x,y) = l_dots;
@@ -75,8 +75,8 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
     dis_d2p = zeros( l_dots, l_ap );
     par_d2p = zeros( l_dots, l_ap );
 %     l_dots,
-    [X,Y] = meshgrid(-rad_band:rad_band, -rad_band:rad_band);
-    mask_disk = X.^2 + Y.^2 <= rad_band^2;
+    [X,Y] = meshgrid(-bar:bar, -bar:bar);
+    mask_disk = X.^2 + Y.^2 <= bar^2;
     for idx_dot = 1: 1: l_dots
         %%%%
 %         if  rem( idx_dot, 200 ) == 0
@@ -136,10 +136,10 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
                 ind_u = ind_ap(idx_u);
                 [x_u, y_u] = ind2sub( [m,n], ind_u );
                 if  sub2idx_dot( x_u, y_u ) > 0
-                    diskNei = sub2idx_ap( x_u-rad_band:x_u+rad_band, y_u-rad_band:y_u+rad_band) & mask_disk;
-                    connection = zeros( 2*rad_band + 1, 2*rad_band + 1 );
-                    connection( rad_band+1, rad_band+1 ) = 1;
-                    for i_con = 1: 1: rad_band
+                    diskNei = sub2idx_ap( x_u-bar:x_u+bar, y_u-bar:y_u+bar) & mask_disk;
+                    connection = zeros( 2*bar + 1, 2*bar + 1 );
+                    connection( bar+1, bar+1 ) = 1;
+                    for i_con = 1: 1: bar
                         temp = imfilter( connection, I_nei9 );
                         temp = temp & diskNei;
                         
@@ -149,8 +149,8 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
                         connection = temp;
                     end
                     [X_con,Y_con] = find( connection > 0 );
-                    DX_con = X_con - rad_band - 1;
-                    DY_con = Y_con - rad_band - 1;
+                    DX_con = X_con - bar - 1;
+                    DY_con = Y_con - bar - 1;
                     for i_con = 1: 1: length(DX_con)
                         x_con = x_u + DX_con(i_con);
                         y_con = y_u + DY_con(i_con);

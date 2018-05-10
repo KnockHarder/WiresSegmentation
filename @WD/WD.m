@@ -9,7 +9,7 @@ classdef WD
     end
     
     methods( Static )
-        [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )        
+        [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg, spacing, bar );        
         enImg = contrastEnhance( inImg, pixNum );
     end
     

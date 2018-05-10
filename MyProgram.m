@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 10-May-2018 20:21:33
+% Last Modified by GUIDE v2.5 10-May-2018 21:08:50
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -253,8 +253,20 @@ mask = zeros( m, n );
 mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
-[LDE, PImg, labelImg] = WD.distanceMethod( inImg, enImg );
+str_spac = get( handles.Spacing, 'String' );
+str_bar = get( handles.Bar, 'String' );
+spacing = str2double( str_spac );
+spacing = round( spacing );
+bar = str2double( str_bar );
+bar = round( bar );
+if  isnan(spacing) || isnan(bar) || spacing < 1 || bar < 1
+    set( handles.currentState, 'String', ...
+        '"spacing" and "bar" must be a integer lager than 0' );
+    return;
+end
+[LDE, PImg, labelImg] = WD.distanceMethod( inImg, enImg, spacing, bar );
 % assert( max(max(labelImg)) == length(unique(labelImg)) - 1 );
+
 mask = PImg == 0;
 bkgImg = handles.inImg .* mask;
 grayImg = zeros( m,n,3 );
@@ -382,6 +394,52 @@ function pixelNum_Callback(hObject, eventdata, handles)
 % --- Executes during object creation, after setting all properties.
 function pixelNum_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to pixelNum (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function Spacing_Callback(hObject, eventdata, handles)
+% hObject    handle to Spacing (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of Spacing as text
+%        str2double(get(hObject,'String')) returns contents of Spacing as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function Spacing_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to Spacing (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function Bar_Callback(hObject, eventdata, handles)
+% hObject    handle to Bar (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of Bar as text
+%        str2double(get(hObject,'String')) returns contents of Bar as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function Bar_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to Bar (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
