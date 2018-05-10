@@ -56,7 +56,7 @@ function labelImg = localGrowing( grayImg, enImg )
 %     figure, imshow( bw_dots );
 %     figure, imshow( bw_dots & (1-bw_ap) );
     %%%%%%%%%%%
-    I = grayImg;
+    I = grayImg * enImg;
     for idx_theta = 1 : l_theta
         evidences( :, :, idx_theta ) = imfilter( I, filters(:,:,idx_theta), 'same', 'replicate' );
     end

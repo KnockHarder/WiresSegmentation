@@ -11,8 +11,8 @@ classdef WD
     methods( Static )
         labelImg = localGrowing( grayImg, enImg );
         
-        function enImg = contrastEnhance( inImg )
-            enImg = WD.enhance( inImg, 5000 );
+        function enImg = contrastEnhance( inImg, pixNum )
+            enImg = WD.enhance( inImg, pixNum );
         end
         
     end

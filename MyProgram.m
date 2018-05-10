@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 27-Apr-2018 22:48:27
+% Last Modified by GUIDE v2.5 10-May-2018 17:38:59
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -209,10 +209,18 @@ function contrastEnhance_Callback(hObject, eventdata, handles)
 % hObject    handle to contrastEnhance (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+str = get( handles.pixelNum, 'String' );
+pixNum = str2double(str);
+pixNum = round(pixNum);
+if isnan(pixNum)  ||  pixNum < 0
+    set( handles.currentState, 'String', ...
+        '"Pixel" should be a nature number' );
+    return;
+end
 if( get( handles.vesselBright, 'value' ) )
-    handles.enImg = WD.contrastEnhance( handles.inImg );
+    handles.enImg = WD.contrastEnhance( handles.inImg, pixNum );
 else
-    handles.enImg = WD.contrastEnhance( 1 - handles.inImg );
+    handles.enImg = WD.contrastEnhance( 1 - handles.inImg, pixNum );
 end
 
 set(handles.disOption,'Value',2);
@@ -360,3 +368,26 @@ end
 
 set( handles.localGrowing, 'enable', 'on' );
 guidata( hObject, handles );
+
+
+
+function pixelNum_Callback(hObject, eventdata, handles)
+% hObject    handle to pixelNum (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of pixelNum as text
+%        str2double(get(hObject,'String')) returns contents of pixelNum as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function pixelNum_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to pixelNum (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
