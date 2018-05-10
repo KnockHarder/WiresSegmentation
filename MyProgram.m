@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 10-May-2018 17:38:59
+% Last Modified by GUIDE v2.5 10-May-2018 20:21:33
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -61,11 +61,13 @@ handles.inImg = [];
 handles.enImg = [];
 handles.labelImg = [];
 handles.cropRec = [];
+handles.LDE = [];
+handles.PImg = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
 set( handles.doCrop, 'enable', 'off' );
-set( handles.localGrowing, 'enable', 'off' );
+set( handles.doSeg, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 
 % Update handles structure
@@ -106,6 +108,8 @@ handles.colImg = colImg;
 handles.inImg = inImg;
 handles.enImg = inImg;
 handles.labelImg = [];
+handles.LDE = [];
+handles.Points = [];
 handles.rstImg = [];
 
 [m,n] = size( inImg );
@@ -115,7 +119,7 @@ set(handles.disOption,'Value',1);
 disOption_Callback(hObject, eventdata, handles);
 set( handles.contrastEnhance, 'enable', 'on' );
 set( handles.doCrop, 'enable', 'off' );
-set( handles.localGrowing, 'enable', 'off' );
+set( handles.doSeg, 'enable', 'off' );
 set( handles.labelMenu, 'enable', 'off' );
 set( handles.currentState, 'String','Ready for processing' );
 guidata(hObject, handles);
@@ -131,30 +135,42 @@ function disOption_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns disOption contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from disOption
 v = get(handles.disOption,'Value');
-resize = get( handles.resizeSlider, 'value' );
 colImg = handles.colImg;
 enImg = handles.enImg;
+LDE = handles.LDE;
+pointsImg = handles.PImg;
 rstImg = handles.rstImg;
 
 switch  v
     case    1    % show original image
         if ~isempty( colImg )
-            colImg = imresize( colImg , resize );
             imshow( colImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', 'No image selected');
         end
     case    2    % show contrast enhancement image
         if ~isempty( enImg )
-            enImg = imresize( enImg, resize );
             imshow( enImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', ...
                 'Not contrast-enhanced yet' );
         end
-    case    3    % show result image
+    case    3
+        if ~isempty( LDE )
+            imshow( LDE, 'parent', handles.figAxis );
+        else
+            set( handles.currentState, 'String', ...
+                'Not do segemantation yet' );
+        end
+    case    4
+        if ~isempty( pointsImg )
+            imshow( pointsImg, 'parent', handles.figAxis );
+        else
+            set( handles.currentState, 'String', ...
+                'Not do segemantation yet' );
+        end
+    case    5    % show result image
         if ~isempty( rstImg )
-            rstImg = imresize( rstImg , resize );
             imshow( rstImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', 'No result image found');
@@ -175,34 +191,6 @@ function disOption_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
-% --- Executes on slider movement.
-function resizeSlider_Callback(hObject, eventdata, handles)
-% hObject    handle to resizeSlider (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'Value') returns position of slider
-%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
-value = get( handles.resizeSlider,'value' );
-value = round( value * 10 ) / 10;
-set( handles.resizeSlider, 'value', value );
-set( handles.resizeValue, 'String',  value );
-disOption_Callback(hObject, eventdata, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function resizeSlider_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to resizeSlider (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: slider controls usually have a light gray background.
-if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor',[.9 .9 .9]);
-end
-
 
 % --- Executes on button press in contrastEnhance.
 function contrastEnhance_Callback(hObject, eventdata, handles)
@@ -227,7 +215,7 @@ set(handles.disOption,'Value',2);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Contrast Enhancement is done');
 set( handles.doCrop, 'enable', 'on' );
-set( handles.localGrowing, 'enable', 'on' );
+set( handles.doSeg, 'enable', 'on' );
 guidata(hObject, handles);
 
 
@@ -249,9 +237,9 @@ function vesselDark_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of vesselDark
 
 
-% --- Executes on button press in localGrowing.
-function localGrowing_Callback(hObject, eventdata, handles)
-% hObject    handle to localGrowing (see GCBO)
+% --- Executes on button press in doSeg.
+function doSeg_Callback(hObject, eventdata, handles)
+% hObject    handle to doSeg (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.currentState,'String',...
@@ -265,24 +253,35 @@ mask = zeros( m, n );
 mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
-labelImg = WD.localGrowing( inImg, enImg );
+[LDE, PImg, labelImg] = WD.distanceMethod( inImg, enImg );
 % assert( max(max(labelImg)) == length(unique(labelImg)) - 1 );
-
-colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
-colorI = im2double( colorI );
-mask = labelImg == 0;
-bkgImg = handles.inImg .* mask * 0.5;
+mask = PImg == 0;
+bkgImg = handles.inImg .* mask;
 grayImg = zeros( m,n,3 );
 for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
 end
+colorI = label2rgb( PImg, @jet, [0,0,0] );
+colorI = im2double( colorI );
+pointsImg = imadd( grayImg, colorI );
+
+mask = labelImg == 0;
+bkgImg = handles.inImg .* mask;
+grayImg = zeros( m,n,3 );
+for i = 1 : 3
+    grayImg(:,:,i) = bkgImg;
+end
+colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
+colorI = im2double( colorI );
 rstImg = imadd( grayImg, colorI );
 handles.labelImg = labelImg;
+handles.LDE = LDE;
+handles.PImg = im2uint8(pointsImg);
 handles.rstImg = im2uint8( rstImg );
 
-set(handles.disOption,'Value',3);
+set(handles.disOption,'Value',5);
 disOption_Callback(hObject, eventdata, handles);
-set(handles.currentState,'String','Vessel Growing is done');
+set(handles.currentState,'String','Segamentation is finished');
 set(handles.labelMenu, 'String', 0:max(max(labelImg)) );
 set(handles.labelMenu, 'value', 1 );
 set(handles.labelMenu, 'enable', 'on' );
@@ -303,7 +302,7 @@ colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
 colorI = im2double( colorI );
 labelImg = handles.labelImg;
 mask = labelImg == 0;
-bkgImg = handles.inImg .* mask * 0.5;
+bkgImg = handles.inImg .* mask;
 [m,n] = size(labelImg);
 grayImg = zeros( m,n,3 );
 for i = 1 : 3
@@ -323,7 +322,7 @@ if( label ~= 0 )
         handles.rstImg( X(i), Y(i)+1, : ) = [255, 0, 0];
     end
 end
-set(handles.disOption,'Value',3);
+set(handles.disOption,'Value',5);
 disOption_Callback(hObject, eventdata, handles);
 guidata(hObject, handles);
 
@@ -347,7 +346,7 @@ function doCrop_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 disOption_Callback(hObject, eventdata, handles );
-set( handles.localGrowing, 'enable', 'off' );
+set( handles.doSeg, 'enable', 'off' );
 set( handles.currentState, 'String', ...
     'If everything is done, please double-left-click' );
 guidata( hObject, handles );
@@ -366,7 +365,7 @@ else
     set( handles.currentState, 'String', 'Area select has been canceled' );
 end
 
-set( handles.localGrowing, 'enable', 'on' );
+set( handles.doSeg, 'enable', 'on' );
 guidata( hObject, handles );
 
 

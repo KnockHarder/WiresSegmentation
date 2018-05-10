@@ -9,12 +9,8 @@ classdef WD
     end
     
     methods( Static )
-        labelImg = localGrowing( grayImg, enImg );
-        
-        function enImg = contrastEnhance( inImg, pixNum )
-            enImg = WD.enhance( inImg, pixNum );
-        end
-        
+        [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )        
+        enImg = contrastEnhance( inImg, pixNum );
     end
     
     methods( Static, Access = private )

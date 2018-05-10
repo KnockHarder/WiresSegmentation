@@ -1,4 +1,4 @@
-function labelImg = localGrowing( grayImg, enImg )
+function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg )
     step = 6;
     inc = 90 / step;
     all_theta = inc:inc:180;
@@ -39,8 +39,14 @@ function labelImg = localGrowing( grayImg, enImg )
             sub2idx_dot(x,y) = l_dots;
         end
     end
+    pointsImg = sub2idx_dot > 0;
+    str = strel( 'disk', 2 );
+    pointsImg = imdilate( pointsImg, str );
     
-    ind_ap = find( allwires | imfilter(sub2idx_dot,ones(3,3)) );
+%     ind_ap = find( allwires | imfilter(sub2idx_dot,ones(3,3)) );
+    temp = allwires | sub2idx_dot;
+    str = strel( 'disk', 1 );
+    ind_ap = find( imclose( temp,str) );
     l_ap = length( ind_ap );
     sub2idx_ap = zeros(m,n);
     for idx_ap = 1: 1: l_ap
@@ -56,14 +62,14 @@ function labelImg = localGrowing( grayImg, enImg )
 %     figure, imshow( bw_dots );
 %     figure, imshow( bw_dots & (1-bw_ap) );
     %%%%%%%%%%%
-    I = grayImg * enImg;
+    I = grayImg;
     for idx_theta = 1 : l_theta
         evidences( :, :, idx_theta ) = imfilter( I, filters(:,:,idx_theta), 'same', 'replicate' );
     end
     [maxEvi,~] = max( evidences, [], 3 );
     maxEvi = maxEvi / max(max(maxEvi)) * m;
     [DX,DY,DE] = get8diff( maxEvi );
-    
+    LDE = maxEvi / m;
     
     I_nei9 = ones(3,3);
     dis_d2p = zeros( l_dots, l_ap );
@@ -73,9 +79,9 @@ function labelImg = localGrowing( grayImg, enImg )
     mask_disk = X.^2 + Y.^2 <= rad_band^2;
     for idx_dot = 1: 1: l_dots
         %%%%
-        if  rem( idx_dot, 200 ) == 0
-            display(idx_dot);
-        end
+%         if  rem( idx_dot, 200 ) == 0
+%             display(idx_dot);
+%         end
         %%%%
         x_dot = dots{idx_dot}(1);
         y_dot = dots{idx_dot}(2);
@@ -205,7 +211,7 @@ function labelImg = localGrowing( grayImg, enImg )
             end
 
             param_k = max_theta * step / pi + 1;
-            dis_dd(idx_headD,idx_endD) = dis_d2p(idx_headD,idx_endP) * param_k;
+            dis_dd(idx_headD,idx_endD) = dis_d2p(idx_headD,idx_endP) * param_k^2;
         end
     end
     
