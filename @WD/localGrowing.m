@@ -208,155 +208,135 @@ function labelImg = localGrowing( grayImg, enImg )
             dis_dd(idx_headD,idx_endD) = dis_d2p(idx_headD,idx_endP) * param_k;
         end
     end
-    old_ddd = dis_dd;
-    dis_dd = min( dis_dd, dis_dd' );
     
-    child_dd = zeros( l_dots, 1 );
-    par_dd = zeros( l_dots, 1 );
-    child_old = child_dd + 1;
-    while   ~isequal( child_dd, child_old )
-        child_old = par_dd;
-        par_dd = child_dd;
-        child_dd = child_old;
+    old_dis = dis_dd;
+    dis_dd = min( dis_dd, dis_dd' );
+    for     i = 1: 1: l_dots
+        dis_dd(i,i) = inf;
+    end
+    connection = zeros(l_dots+2,l_dots+2);
+    while   1
+        count_con = sum( connection );
+        sourceDot = find( count_con < 2, 1 );
+        if  isempty( sourceDot )
+            break;
+        end
         
-        sourceDots = find( child_dd == 0 );        
-        for idx_headD = sourceDots'
-            dis_i = dis_dd(idx_headD,:);
-            dis_i(idx_headD) = inf;
+        [minValue,dot_minDis] = min( dis_dd(sourceDot,:) );
+        if  minValue == inf
+            connection(sourceDot, l_dots+1) = 1;
+            connection(l_dots+1, sourceDot) = 1;
             
-            par_headD = par_dd(idx_headD);
-            idx_par = par_headD;
-            while   idx_par > 0
-                dis_i( idx_par ) = inf;
-                idx_par = par_dd( idx_par );
+            connection(sourceDot, l_dots+2) = 1;
+            connection(l_dots+2, sourceDot) = 1;
+            continue;
+        end
+        
+        dot_con = find( connection(sourceDot,:) > 0 );
+        if  ~isempty(dot_con)
+            assert( dot_con ~= l_dots + 1 );
+            A = dots{dot_con} - dots{sourceDot};
+            B = dots{dot_minDis} - dots{sourceDot};
+            gama = acos( dot(-A,B)/norm(A)/norm(B) );
+        else
+            gama = 0;
+        end
+        if  gama >= pi/2
+            dis_dd(sourceDot,dot_minDis) = inf;
+            dis_dd(dot_minDis,sourceDot) = inf;
+            continue;
+        end
+        
+        dots_comp = find( connection(dot_minDis,:) > 0 );
+        dots_comp = dots_comp( dots_comp <= l_dots );
+        if   ~isempty(dots_comp)
+            dotA = dots_comp(1);
+            dotB = 0;
+            dotC = sourceDot;
+            A = dots{dotA} - dots{dot_minDis};
+            C = dots{dotC} - dots{dot_minDis};
+            alpha = acos( dot(-A,C)/norm(A)/norm(C) );
+            if  length(dots_comp) > 1
+                dotB = dots_comp(2);
+                B = dots{dotB} - dots{dot_minDis};
+                beta = acos( dot(-B,C)/norm(B)/norm(C) );
+                gama = acos( dot(-A,B)/norm(A)/norm(B) );
+            else
+                beta = inf;
+                gama = inf;
             end
-            
-            while 1
-                [minValue_dis,idx_endD] = min( dis_i );
-                if  minValue_dis == inf
-                    break;
-                end
-                
-                par_endD = par_dd( idx_endD );
-                if  par_endD > 0
-                    if  dis_dd(idx_endD, par_endD) <= dis_dd(idx_endD, idx_headD)
-                        dis_i(idx_endD) = inf;
-                    else
-                        break;
+            [~, idx_min] = min( [alpha,beta,gama] );
+            if  idx_min == 3
+                dis_dd(sourceDot,dot_minDis) = inf;
+                dis_dd(dot_minDis,sourceDot) = inf;
+                continue;
+            else
+                connection(sourceDot,dot_minDis) = 1;
+                connection(dot_minDis,sourceDot) = 1;
+                dis_dd(sourceDot,dot_minDis) = inf;
+                dis_dd(dot_minDis,sourceDot) = inf;
+                if  idx_min == 1
+                    if  dotB > 0
+                        connection(dot_minDis,dotB) = 0;
+                        connection(dotB,dot_minDis) = 0;
                     end
                 else
-                    break;
+                    connection(dot_minDis,dotA) = 0;
+                    connection(dotA,dot_minDis) = 0;
                 end
             end
-            if  minValue_dis == inf
-                continue;
-            end
-
-            if  par_headD > 0
-                A = dots{par_headD} - dots{idx_headD};
-                B = dots{idx_endD} - dots{idx_headD};
-
-                theta = acos( dot(-A,B)/norm(A)/norm(B) );
-                if  theta < pi/2
-                    if  par_endD > 0
-                        child_dd(par_endD) = 0;
-                    end
-                    child_dd( idx_headD ) = idx_endD;
-                    par_dd( idx_endD ) = idx_headD;
-                end
-            else
-                if  par_endD > 0
-                    child_dd(par_endD) = 0;
-                end
-                child_dd( idx_headD ) = idx_endD;
-                par_dd( idx_endD ) = idx_headD;
-            end
+        else
+            connection(sourceDot,dot_minDis) = 1;
+            connection(dot_minDis,sourceDot) = 1;
+            dis_dd(sourceDot,dot_minDis) = inf;
+            dis_dd(dot_minDis,sourceDot) = inf;
         end
     end
     
-    %%%%%%%%
-    l_dots,
-    count_child = sum(sum( child_dd == 0 )),
-    count_parents = sum(sum( par_dd == 0 )),
-    %%%%%%%%
-    visited = zeros( 1, l_dots );
-    doneAsEnd = zeros( 1, l_dots );
-    label_dot = zeros( 1, l_dots );
-    idx_headD = find( visited == 0, 1 );
-    labelImg = zeros(m,n);
     maxLabel = 0;
-%     whilecount = 0;%%%%%%%%%
-    while   ~isempty( idx_headD )
-%         whilecount = whilecount + 1,
-        par_headD = par_dd( idx_headD );
-        if  par_headD > 0  &&  label_dot( par_headD ) > 0
-            label = label_dot( par_headD );
-        else
-            maxLabel = maxLabel + 1;
-            label = maxLabel;
+    labelHist = zeros(l_dots,1);
+    labelImg = zeros(m,n);
+    while   1
+        headDot = find( connection(l_dots+1,:) > 0, 1 );
+        if  isempty( headDot )
+            break;
         end
         
-        
-        labelImg( dots{idx_headD}(1), dots{idx_headD}(2) ) = label;
-        label_dot( idx_headD ) = label;
-        visited( idx_headD ) = 1;
-        
-        idx_tailD = child_dd( idx_headD );
-        while   idx_tailD > 0
-%             sum(sum( visited ) ),
-            if visited( idx_tailD )
-               corLabel = label_dot( idx_tailD );
-               if corLabel ~= label
-                   labelImg( labelImg == label ) = corLabel;
-               end
-               
-               if doneAsEnd( idx_tailD )
-                   break;
-               else
-                   label = corLabel;
-               end
+        maxLabel = maxLabel + 1;
+        connection(l_dots+1,headDot) = 0;
+        connection(headDot,l_dots+1) = 0;
+        startD = headDot;
+        endD = find( connection(headDot,:) > 0, 1 );
+        while  endD < l_dots + 1
+            if  old_dis(startD, endD) == inf
+                tempD = startD;
+                startD = endD;
+                endD = tempD;
             end
-            
-            if  old_ddd(idx_headD, idx_tailD) < inf
-                idx_startD = idx_headD;
-                idx_endD = idx_tailD;
-            else
-                idx_startD = idx_tailD;
-                idx_endD = idx_headD;
-            end
-            idx_startP = sub2idx_ap( dots{idx_startD}(1), dots{idx_startD}(2) );
-            x = dots{idx_endD}(1);
-            y = dots{idx_endD}(2);
+            startP = sub2idx_ap( dots{startD}(1), dots{startD}(2) );
+            x = dots{endD}(1);
+            y = dots{endD}(2);
             idx = sub2idx_ap( x, y );  
-            while   idx ~= idx_startP
+            while   idx ~= startP
                 ind = ind_ap( idx );
                 [x, y] = ind2sub( [m,n], ind );
-                labelImg( x, y ) = label;
-                idx = par_d2p( idx_startD, idx );
+                labelImg( x, y ) = maxLabel;
+                labelHist(maxLabel) = labelHist(maxLabel) + 1;
+                idx = par_d2p( startD, idx );
                 assert( idx > 0 );
             end
-            
-            visited( idx_tailD ) = 1;
-            doneAsEnd( idx_tailD ) = 1;
-            label_dot( idx_tailD ) = label;
-            idx_headD = idx_tailD;
-            idx_tailD = child_dd( idx_headD );
+            connection(startD,endD) = 0;
+            connection(endD,startD) = 0;
+            startD = endD;
+            endD = find( connection(endD,:) > 0 );
         end
-        
-        idx_headD = find( visited == 0, 1 );
     end
     
-    label_uniq = unique( labelImg );
-    label_uniq = label_uniq( label_uniq > 0 );
-    label = 0;
+    useable = find(labelHist > 20 );
     temp = labelImg;
     labelImg = zeros(m,n);
-    for i = 1 : length( label_uniq )
-        findImg = temp == label_uniq(i);
-        if  sum(sum( findImg )) > 20 
-            label = label + 1;
-            labelImg( findImg ) = label;
-        end
+    for     i = 1: 1: length(useable)
+        labelImg( temp == useable(i) ) = i;
     end
 end
 
