@@ -1,4 +1,4 @@
-function labelImg = localGrowing( grayImg, enImg )
+function labelImg = localGrowing( grayImg, enImg, iter )
     step = 6;
     inc = 90 / step;
     all_theta = inc:inc:180;
@@ -54,10 +54,10 @@ function labelImg = localGrowing( grayImg, enImg )
     assert( minlen > sz );
     while ~isequal( preI, labelImg )
         %%%%%%%%%
-        if whilecount == 10
+        if whilecount > iter
             break;
         end
-        whilecount = whilecount + 1,
+        whilecount = whilecount + 1;
         %%%%%%%%%
         preI = labelImg;
         for label = 1 :1 :l_lines

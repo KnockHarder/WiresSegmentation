@@ -22,7 +22,7 @@ function varargout = MyProgram(varargin)
 
 % Edit the above text to modify the response to help untitled
 
-% Last Modified by GUIDE v2.5 27-Apr-2018 22:48:27
+% Last Modified by GUIDE v2.5 10-May-2018 23:12:29
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -131,7 +131,6 @@ function disOption_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns disOption contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from disOption
 v = get(handles.disOption,'Value');
-resize = get( handles.resizeSlider, 'value' );
 colImg = handles.colImg;
 enImg = handles.enImg;
 rstImg = handles.rstImg;
@@ -139,14 +138,12 @@ rstImg = handles.rstImg;
 switch  v
     case    1    % show original image
         if ~isempty( colImg )
-            colImg = imresize( colImg , resize );
             imshow( colImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', 'No image selected');
         end
     case    2    % show contrast enhancement image
         if ~isempty( enImg )
-            enImg = imresize( enImg, resize );
             imshow( enImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', ...
@@ -154,7 +151,6 @@ switch  v
         end
     case    3    % show result image
         if ~isempty( rstImg )
-            rstImg = imresize( rstImg , resize );
             imshow( rstImg, 'parent', handles.figAxis );
         else
             set( handles.currentState, 'String', 'No result image found');
@@ -175,34 +171,6 @@ function disOption_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
-% --- Executes on slider movement.
-function resizeSlider_Callback(hObject, eventdata, handles)
-% hObject    handle to resizeSlider (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'Value') returns position of slider
-%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
-value = get( handles.resizeSlider,'value' );
-value = round( value * 10 ) / 10;
-set( handles.resizeSlider, 'value', value );
-set( handles.resizeValue, 'String',  value );
-disOption_Callback(hObject, eventdata, handles);
-
-
-% --- Executes during object creation, after setting all properties.
-function resizeSlider_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to resizeSlider (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: slider controls usually have a light gray background.
-if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor',[.9 .9 .9]);
-end
-
 
 % --- Executes on button press in contrastEnhance.
 function contrastEnhance_Callback(hObject, eventdata, handles)
@@ -251,13 +219,20 @@ set(handles.currentState,'String',...
 guidata(hObject, handles);
 drawnow;
 
+str_iter = get( handles.Iteration, 'String' );
+iter = str2double( str_iter );
+if  isnan(iter) || iter < 0
+    set( handles.currentState, 'String', ...
+        '"iteration" should be a positive integer' );
+    return;
+end
 [m,n] = size( handles.inImg );
 rec = handles.cropRec;
 mask = zeros( m, n );
 mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
-labelImg = WD.localGrowing( inImg, enImg );
+labelImg = WD.localGrowing( inImg, enImg, iter );
 % assert( max(max(labelImg)) == length(unique(labelImg)) - 1 );
 
 colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
@@ -360,3 +335,26 @@ end
 
 set( handles.localGrowing, 'enable', 'on' );
 guidata( hObject, handles );
+
+
+
+function Iteration_Callback(hObject, eventdata, handles)
+% hObject    handle to Iteration (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of Iteration as text
+%        str2double(get(hObject,'String')) returns contents of Iteration as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function Iteration_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to Iteration (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
