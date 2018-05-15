@@ -1,8 +1,12 @@
-function labelImg = localGrowing( grayImg, enImg, iter )
+function labelImg = localGrowing( grayImg, bwImg, iter )
     step = 6;
     inc = 90 / step;
     all_theta = inc:inc:180;
     sz = 6;
+    
+    enImg = grayImg .* bwImg;
+    thresh = min(min( enImg(enImg>0) )) * 0.9;
+    enImg = (enImg - thresh)/(1-thresh);
     
     I = enImg;
     [m, n] = size( I );
@@ -18,15 +22,10 @@ function labelImg = localGrowing( grayImg, enImg, iter )
     
     variances = var(evidences, 1, 3);
     variances = variances * l_theta;   
-    eI = edge( grayImg, 'sobel' );
-    str = strel( 'disk', 2 );
-    bw = imclose( eI, str );
-    allwires = (bw .* I) > 0;
-
-    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );    
+    skI = bwmorph( bwImg, 'thin', inf );    
     labelImg = zeros(m,n);
-    labelImg( variances <= varTresh & skI == 1 ) = -2;
-    inds = find( variances > varTresh  &  skI == 1 );
+    labelImg( variances <= varTresh & skI ) = -2;
+    inds = find( variances > varTresh  & skI );
     lines = cell( m*n, 1 );
     l_eachLine = zeros(m*n, 1);
     for i = 1 : length(inds)
@@ -38,6 +37,10 @@ function labelImg = localGrowing( grayImg, enImg, iter )
     end
     l_lines = length(inds);
     
+    I = grayImg;
+    for i = 1 : l_theta
+        evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
+    end
     [~, directV] = max(evidences, [], 3);
     directH = rem( directV + step, l_theta );
     directH( directH == 0 ) = l_theta;
