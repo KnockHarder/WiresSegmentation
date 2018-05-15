@@ -15,24 +15,14 @@ er = imerode( bw, se );
 
 wiresImg = inImg .* er;
 histValue = imhist( wiresImg );
-histValue( 1: floor(end/2) ) = 0;
-sumHist = histValue;
-for     i = 2: 1: length(sumHist)
-    sumHist(i) = sumHist(i) + sumHist(i-1);
-end
-[~,modeV] = max( histValue );
-midV = find( sumHist >= sumHist(end)/2, 1 );
+halfPost = histValue( ceil(end/2): end );
+lhp = length( halfPost );
+dctV = dct( halfPost );
+k = 30;
+idctV = idct( dctV(1:1:k) );
+[~,peak] = max( abs(idctV) );
+lambda = peak/30/2 + 0.3;
 
-while   modeV ~= midV
-    histValue(modeV) = 0;
-    sumHist = histValue;
-    for     i = 2: 1: length(sumHist)
-        sumHist(i) = sumHist(i) + sumHist(i-1);
-    end
-    [~,modeV] = max( histValue );
-    midV = find( sumHist >= sumHist(end)/2, 1 );
-end
-lambda = (modeV-10)/255;
 enImg = (inImg > lambda) .* bw;
 end
 
