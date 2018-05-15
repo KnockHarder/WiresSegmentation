@@ -16,7 +16,6 @@ er = imerode( bw, se );
 wiresImg = inImg .* er;
 histValue = imhist( wiresImg );
 halfPost = histValue( ceil(end/2): end );
-lhp = length( halfPost );
 dctV = dct( halfPost );
 k = 30;
 idctV = idct( dctV(1:1:k) );

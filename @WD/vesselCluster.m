@@ -1,7 +1,12 @@
-function labelImg = vesselCluster( oriImg, enImg )
+function labelImg = vesselCluster( oriImg, bwImg )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
-assert( ndims(enImg) == 2 );
+enImg = oriImg .* bwImg;
+thresh = min( enImg(enImg > 0) );
+thresh = thresh * 0.9;
+display( thresh );
+enImg = (enImg-thresh)/(1-thresh);
+% figure, imshow( enImg );
 
 I = enImg;
 [m, n] = size( I );
@@ -21,16 +26,16 @@ end
 variances = var(evidences, 1, 3);
 variances = variances * l_theta;
 [maxEvi, ~] = max(evidences, [], 3);
-weightImg = oriImg .* maxEvi;
 wid = sz;
 pointLabel = zeros(m,n);
-pointLabel( variances > varTresh ) = 1;
-pointLabel( variances <= varTresh & weightImg > 0.1 ) = 2;
+pointLabel( variances > varTresh  & bwImg) = 1;
+pointLabel( variances <= varTresh & bwImg ) = 2;
 pointLabel( 1:wid, : ) = 0;
 pointLabel( :, 1:wid ) = 0;
 pointLabel( m-wid+1:m, : ) = 0;
 pointLabel( :, n-wid+1:n ) = 0;
-
+% labelImg = pointLabel;
+% return;
 I = oriImg;
 for i = 1 : l_theta
     evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
