@@ -1,9 +1,12 @@
-function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg, spacing, bar )
+function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, bwImg, spacing, bar )
     step = 6;
     inc = 90 / step;
     all_theta = inc:inc:180;
     sz = 6;
     
+    enImg = grayImg .* bwImg;
+    thresh = min(enImg(enImg > 0 )) * 0.9;
+    enImg = ( enImg - thresh ) / ( 1 - thresh );
     I = enImg;
     [m, n] = size( I );
     l_theta = length( all_theta );
@@ -17,12 +20,8 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg, spacing, b
     end
     variances = var(evidences, 1, 3);
     variances = variances * l_theta;   
-    eI = edge( grayImg, 'sobel' );
-    str = strel( 'disk', 2 );
-    bw = imclose( eI, str );
-    allwires = (bw .* I) > 0;
 
-    skI = bwmorph( allwires, 'thin', inf ) | bwmorph( bw, 'thin', inf );  
+    skI = bwmorph( bwImg, 'thin', inf );  
     inds = find( variances > varTresh  &  skI == 1 );
     [X,Y] = meshgrid(-spacing:spacing);
     mask_disk = (X.^2 + Y.^2) <= spacing^2;
@@ -44,9 +43,8 @@ function [LDE, pointsImg, labelImg] = distanceMethod( grayImg, enImg, spacing, b
     pointsImg = imdilate( pointsImg, str );
     
 %     ind_ap = find( allwires | imfilter(sub2idx_dot,ones(3,3)) );
-    temp = allwires | sub2idx_dot;
-    str = strel( 'disk', 1 );
-    ind_ap = find( imclose( temp,str) );
+    
+    ind_ap = find( bwImg );
     l_ap = length( ind_ap );
     sub2idx_ap = zeros(m,n);
     for idx_ap = 1: 1: l_ap
