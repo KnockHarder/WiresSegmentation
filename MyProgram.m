@@ -61,7 +61,6 @@ handles.inImg = [];
 handles.enImg = [];
 handles.labelImg = [];
 handles.cropRec = [];
-handles.labels = [];
 handles.rstImg = [];
 
 set(handles.contrastEnhance,'enable','off');
@@ -107,7 +106,6 @@ handles.colImg = colImg;
 handles.inImg = inImg;
 handles.enImg = inImg;
 handles.labelImg = [];
-handles.labels = [];
 handles.rstImg = [];
 [m,n] = size( inImg );
 handles.cropRec = [1, 1, n, m];
@@ -226,7 +224,7 @@ mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
 
-[handles.labelImg, handles.labels] = WD.vesselCluster( inImg, enImg );
+handles.labelImg = WD.vesselCluster( inImg, enImg );
 labelImg = handles.labelImg;
 mask = labelImg == 0;
 bkgImg = handles.inImg .* mask;
@@ -242,7 +240,7 @@ handles.rstImg = im2uint8( rstImg );
 set(handles.disOption,'Value',3);
 disOption_Callback(hObject, eventdata, handles);
 set(handles.currentState,'String','Vessel Cluster is done');
-set(handles.labelMenu, 'String', [0:length(handles.labels)] );
+set(handles.labelMenu, 'String', 0:max(max(handles.labelImg)) );
 set(handles.labelMenu, 'value', 1 );
 set(handles.labelMenu, 'enable', 'on' );
 guidata(hObject, handles);
@@ -256,12 +254,7 @@ function labelMenu_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns labelMenu contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from labelMenu
-label_idx = get( handles.labelMenu, 'value') - 1;
-if label_idx ~= 0
-    label = handles.labels(label_idx);
-else
-    label = 0;
-end
+label = get( handles.labelMenu, 'value') - 1;
 
 colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
 colorI = im2double( colorI );

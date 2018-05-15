@@ -1,115 +1,157 @@
-function [labelImg, labels] = vesselCluster( oriImg, enImg )
+function labelImg = vesselCluster( oriImg, enImg )
 %VESSELCLUSTER 此处显示有关此函数的摘要
 %   此处显示详细说明
 assert( ndims(enImg) == 2 );
 
 I = enImg;
 [m, n] = size( I );
-
-all_theta = -90:15:90;
+inc = 15;
+step = 90/inc;
+assert( step == 6 );
+all_theta = inc:inc:180;
 l_theta = length( all_theta );
 sz = 6; assert( m > sz * 3  &&  n > sz * 3 );
 filters = getLDE( sz, 0.6, all_theta );
+
 evidences = zeros( m, n, l_theta ); 
 varTresh = 0.2;
 for i = 1 : l_theta
     evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
 end
-
 variances = var(evidences, 1, 3);
 variances = variances * l_theta;
-[maxEvi, directMax] = max(evidences, [], 3);
+[maxEvi, ~] = max(evidences, [], 3);
 weightImg = oriImg .* maxEvi;
+wid = sz;
+pointLabel = zeros(m,n);
+pointLabel( variances > varTresh ) = 1;
+pointLabel( variances <= varTresh & weightImg > 0.1 ) = 2;
+pointLabel( 1:wid, : ) = 0;
+pointLabel( :, 1:wid ) = 0;
+pointLabel( m-wid+1:m, : ) = 0;
+pointLabel( :, n-wid+1:n ) = 0;
 
-labelImg = zeros(m,n);
-labelImg( variances > varTresh ) = -1;
-labelImg( variances <= varTresh & weightImg > 0.1 ) = -2;
- 
-maxLabel = 0;
-labelHits = zeros(m*n, 1);
-hitsThresh = 50;
-bendError = 10;
-
-labelImg( 1:sz, : ) = 0;
-labelImg( :, 1:sz ) = 0;
-labelImg( m-sz+1:m, : ) = 0;
-labelImg( :, n-sz+1:n ) = 0;
+I = oriImg;
+for i = 1 : l_theta
+    evidences( :, :, i ) = imfilter( I, filters(:,:,i), 'same', 'replicate' );
+end
+variances = var(evidences, 1, 3);
+variances = variances * l_theta;
+[maxEvi, directV] = max(evidences, [], 3);
+directH = rem( directV + step, step*2 );
+pointLabel( variances > varTresh & pointLabel == 2 ) = 1;
 
 sigma = 1;
-[X,Y] = meshgrid(-sz:sz);
+[X,Y] = meshgrid(-wid:wid);
 G = exp(-(X.^2+Y.^2)/(2*sigma^2))/(sqrt(2*pi)*sigma);
-G = 1 - G;
+G = G / max(max(G));
 
-for i = sz + 1 : m - sz
-    for j = sz + 1 : n -sz
-        if labelImg(i,j) >= 0
+hitsThresh = 50;
+labelImg = zeros( m,n );
+maxLabel = 0;
+labelHits = zeros(m*n, 1);
+clusterCenter = zeros( m*n, 2, 2 );
+for     ind_p = find( pointLabel == 1 )'
+    [x,y] = ind2sub( [m,n], ind_p );
+    maxLabel = maxLabel + 1;
+    labelImg(x,y) = maxLabel;
+    clusterCenter(maxLabel,1,:) = [x,y];
+    clusterCenter(maxLabel,2,:) = [x,y];
+    labelHits(maxLabel) = 1;
+end
+for i = 1 :1 :maxLabel
+    assert( sum(sum(labelImg == i)) == labelHits(i) );
+end 
+masks_band = getLDE( wid, 0.5, all_theta ) > 0;
+
+preI = labelImg + 1;
+whilecount = 0;
+while   ~isequal( preI, labelImg )
+    if  whilecount > 50
+       break;
+    end
+    whilecount = whilecount + 1,
+    
+    preI = labelImg;
+    for     label = 1: 1: maxLabel
+        if  labelHits(label) == 0
             continue;
         end
         
-        labels_neighbor = labelImg( i-sz:i+sz, j-sz:j+sz );
-        directs_neighbor = directMax( i-sz:i+sz, j-sz:j+sz );
-        labelIJ = labels_neighbor( sz+1, sz+1 );
-        directIJ = directs_neighbor( sz+1, sz+1 );
-        
-        idx_band =  filters(:,:,directIJ) > 0 & labels_neighbor > 0 ;
-        labels_band = unique( labels_neighbor( idx_band ) );
-        
-        if isempty(labels_band)
-            if labelIJ == -1
-                maxLabel = maxLabel + 1;
-                labels_neighbor( sz+1, sz+1 ) = maxLabel;
-                labelHits(maxLabel) = 1;
-            else
-                labels_neighbor( sz+1, sz+1 ) = 0;
-            end
-        else
-            l_LB = length(labels_band);
-            errors = zeros(l_LB, 1);
-            for jj = 1 : l_LB
-                label = labels_band(jj);
-                mask = labels_neighbor == label;
-                Gmask = G .* mask;
-                Gmask = Gmask / sum( sum(G) );
-                Dmask = directs_neighbor .* mask;
-                
-                errors(jj) = sum( sum( (Dmask - directIJ).^2 .* Gmask ) );
-            end
+        for     i = 1: 2
+            x = clusterCenter(label,i,1);
+            y = clusterCenter(label,i,2);
+            labels_nei = labelImg( x-wid:x+wid, y-wid:y+wid );
+            dV_nei = directV( x-wid:x+wid, y-wid:y+wid );
+            dH_nei = directH( x-wid:x+wid, y-wid:y+wid );
+            evi_nei = maxEvi( x-wid:x+wid, y-wid:y+wid );
+            dV = directV( x, y );
+            dH = directH( x, y );
+            evi = maxEvi( x, y );
             
-            [minError,idx] = min(errors);
-            if minError < bendError
-                label = labels_band(idx);
-                labels_neighbor( sz+1, sz+1 ) = label;
-                labelHits(label) = labelHits(label) + 1;
+            diffV = dV_nei + 0.5 - dV;
+            diffV = abs( floor(diffV + sign(diffV)) );
+            diffH = dH_nei + 0.5 - dH;
+            diffH = abs( floor(diffH + sign(diffH)) );
+            diff = min( diffV, diffH );
+            errG = (1-G) .* (diff.^2) .* abs(evi_nei - evi);
+            
+            mask = pointLabel( x-wid:x+wid, y-wid:y+wid ) > 0;
+            mask( labels_nei == label ) = 0;
+            mask = mask .* masks_band(:,:,dV);
+            while   ~isempty( find( mask > 0, 1 ) )
+                errors = mask .* errG;
+                errors( errors == 0 ) = inf;
+                [minCol, X] = min( errors );
+                [~,y_end] = min( minCol );
+                x_end = X(y_end);
+                x_find = x + ( x_end - wid - 1);
+                y_find = y + ( y_end - wid - 1 );
                 
-                for idx = idx_band
-                    if labels_neighbor(idx) == -2
-                        labels_neighbor(idx) = label;
-                        directs_neighbor(idx) = directIJ;
-                    end
+                if  diff(x_end,y_end) > step / 2
+                    mask( x_end, y_end ) = 0;
+                    continue;
                 end
-            else
-                if labelIJ == -1
-                    maxLabel = maxLabel + 1;
-                    labels_neighbor( sz+1, sz+1 ) = maxLabel;
-                    labelHits(maxLabel) = 1;
+                
+                label_find = labelImg( x_find, y_find );
+                if  label_find > 0
+                    source_find = squeeze( clusterCenter(label_find,:,:) );
+                    idx_source = 0;
+                    for     ii = 1 : 2
+                        if  isequal( [x_find,y_find], source_find(ii,:) )
+                            idx_source = ii;
+                        end
+                    end
+                    
+                    if  idx_source == 0
+                        mask( x_end, y_end ) = 0;
+                        continue;
+                    end
+                    
+                    labelImg( labelImg == label_find ) = label;
+                    labelHits( label ) = labelHits(label) + labelHits(label_find);
+                    labelHits( label_find ) = 0;
+                    clusterCenter( label, i, : ) = source_find( 3-idx_source, : );
+                    break;
                 else
-                    labels_neighbor( sz+1, sz+1 ) = 0;
+                    labelImg(x_find, y_find) = label;
+                    labelHits( label ) = labelHits( label ) + 1;
+                    break;
                 end
             end
         end
-        
-        labelImg( i-sz:i+sz, j-sz:j+sz ) = labels_neighbor;
-        directMax( i-sz:i+sz, j-sz:j+sz ) = directs_neighbor;
     end
 end
 
-labelHits = labelHits(1:maxLabel);
-idx =  1:length(labelHits);
-for badLabel = idx( labelHits < hitsThresh )
-    labelImg( labelImg == badLabel ) = 0;
+for i = 1 :1 :maxLabel
+    assert( sum(sum(labelImg == i)) == labelHits(i) );
 end
-labels = idx( labelHits >= hitsThresh );
-
+goodLabels = find( labelHits > hitsThresh );
+temp = labelImg;
+labelImg = zeros(m,n);
+for i = 1: 1: length(goodLabels)
+    labelImg( temp == goodLabels(i) ) = i;
+end
 end
 
 
