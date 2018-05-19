@@ -185,8 +185,8 @@ function labelImg = localGrowing( grayImg, bwImg, iter )
                             end
                                 
                             angles = [ alpha, beta, theta ];
-                            [~,idx_min] = min( angles );
-                            if  idx_min == 3
+                            [minV,idx_min] = min( angles );
+                            if  idx_min == 3  ||  theta == minV
                                 mask( x_end, y_end ) = 0;
                                 continue;
                             end
