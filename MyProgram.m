@@ -224,7 +224,9 @@ mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
 
+t0 = cputime;
 handles.labelImg = WD.vesselCluster( inImg, enImg );
+travel = cputime - t0,
 labelImg = handles.labelImg;
 mask = labelImg == 0;
 bkgImg = handles.inImg .* mask;
@@ -232,7 +234,7 @@ grayImg = zeros( m,n,3 );
 for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
 end
-colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
+colorI = label2rgb( labelImg, @colorcube, [0, 0, 0], 'shuffle' );
 colorI = im2double( colorI );
 rstImg = imadd( grayImg, colorI );
 handles.rstImg = im2uint8( rstImg );
@@ -256,7 +258,7 @@ function labelMenu_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from labelMenu
 label = get( handles.labelMenu, 'value') - 1;
 
-colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
+colorI = label2rgb( handles.labelImg, @colorcube   , [0, 0, 0], 'shuffle' );
 colorI = im2double( colorI );
 labelImg = handles.labelImg;
 mask = labelImg == 0;
