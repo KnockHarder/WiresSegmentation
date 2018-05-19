@@ -264,16 +264,17 @@ if  isnan(spacing) || isnan(bar) || spacing < 1 || bar < 1
         '"spacing" and "bar" must be a integer lager than 0' );
     return;
 end
+tic;
 [LDE, PImg, labelImg] = WD.distanceMethod( inImg, enImg, spacing, bar );
 % assert( max(max(labelImg)) == length(unique(labelImg)) - 1 );
-
+t1 = toc,
 mask = PImg == 0;
 bkgImg = handles.inImg .* mask;
 grayImg = zeros( m,n,3 );
 for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
 end
-colorI = label2rgb( PImg, @jet, [0,0,0] );
+colorI = label2rgb( PImg, @colorcube, [0,0,0], 'shuffle' );
 colorI = im2double( colorI );
 pointsImg = imadd( grayImg, colorI );
 
@@ -283,7 +284,7 @@ grayImg = zeros( m,n,3 );
 for i = 1 : 3
     grayImg(:,:,i) = bkgImg;
 end
-colorI = label2rgb( labelImg, @jet, [0, 0, 0] );
+colorI = label2rgb( labelImg, @colorcube, [0, 0, 0], 'shuffle' );
 colorI = im2double( colorI );
 rstImg = imadd( grayImg, colorI );
 handles.labelImg = labelImg;
@@ -310,7 +311,7 @@ function labelMenu_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from labelMenu
 label = get( handles.labelMenu, 'value') - 1;
 
-colorI = label2rgb( handles.labelImg, @jet, [0, 0, 0] );
+colorI = label2rgb( handles.labelImg, @colorcube, [0, 0, 0], 'shuffle' );
 colorI = im2double( colorI );
 labelImg = handles.labelImg;
 mask = labelImg == 0;
