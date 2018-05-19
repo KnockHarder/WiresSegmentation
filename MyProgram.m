@@ -224,9 +224,9 @@ mask( rec(2):rec(2)+rec(4)-1, rec(1):rec(1)+rec(3)-1 ) = 1;
 inImg = handles.inImg .* mask;
 enImg = handles.enImg .* mask;
 
-t0 = cputime;
+tic ;
 handles.labelImg = WD.vesselCluster( inImg, enImg );
-travel = cputime - t0,
+t0 = toc,
 labelImg = handles.labelImg;
 mask = labelImg == 0;
 bkgImg = handles.inImg .* mask;
