@@ -208,7 +208,8 @@ end
 if( get( handles.vesselBright, 'value' ) )
     handles.enImg = WD.contrastEnhance( handles.inImg, pixNum );
 else
-    handles.enImg = WD.contrastEnhance( 1 - handles.inImg, pixNum );
+    handles.inImg = 1 - handles.inImg;
+    handles.enImg = WD.contrastEnhance( handles.inImg, pixNum );
 end
 
 set(handles.disOption,'Value',2);
