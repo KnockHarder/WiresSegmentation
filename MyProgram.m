@@ -179,7 +179,8 @@ function contrastEnhance_Callback(hObject, eventdata, handles)
 if( get( handles.vesselBright, 'value' ) )
     handles.enImg = WD.contrastEnhance( handles.inImg );
 else
-    handles.enImg = WD.contrastEnhance( 1 - handles.inImg );
+    handles.inImg = 1 - handles.inImg;
+    handles.enImg = WD.contrastEnhance( handles.inImg );
 end
 
 set(handles.disOption,'Value',2);
